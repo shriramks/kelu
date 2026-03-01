@@ -125,7 +125,7 @@ export default function Dashboard() {
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-bold text-gray-900 tracking-tight">
-              Spend-Stock
+              Stock News
             </h1>
             <span className="text-xs text-gray-400 hidden sm:block">
               Financial News Dashboard
