@@ -46,7 +46,7 @@ function extractRealUrl(googleUrl: string): string {
 async function fetchArticleContent(url: string): Promise<string> {
   try {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 5000)
+    const timeout = setTimeout(() => controller.abort(), 1500)
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
@@ -99,7 +99,8 @@ async function fetchArticleContent(url: string): Promise<string> {
 export async function fetchRssFeed(
   url: string,
   coverageStart: Date,
-  coverageEnd: Date
+  coverageEnd: Date,
+  skipUrls: Set<string> = new Set()
 ): Promise<RssArticle[]> {
   try {
     const feed = await parser.parseURL(url)
@@ -124,9 +125,12 @@ export async function fetchRssFeed(
 
       const realUrl = extractRealUrl(link)
 
-      // Fetch full article content; fall back to RSS snippet if it fails
-      const fullContent = await fetchArticleContent(realUrl)
-      const snippet = fullContent.length > rssSnippet.length ? fullContent : rssSnippet
+      // Skip full article fetch for already-analyzed URLs — saves significant time
+      let snippet = rssSnippet
+      if (!skipUrls.has(link)) {
+        const fullContent = await fetchArticleContent(realUrl)
+        snippet = fullContent.length > rssSnippet.length ? fullContent : rssSnippet
+      }
 
       console.log(`  [rss] "${stripHtml(item.title || '').slice(0, 60)}" — snippet: ${snippet.length} chars`)
 

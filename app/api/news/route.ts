@@ -75,20 +75,12 @@ export async function POST(req: NextRequest) {
   for (const stock of STOCKS) {
     allTasks.push(async () => {
       try {
-        const articles = await fetchRssFeed(stock.rssUrl, coverageStart, coverageEnd)
-        console.log(`[${stock.ticker}] RSS: ${articles.length} articles in window`)
-
-        if (articles.length === 0) return
-
-        // Dedup: skip only articles already analyzed WITH a signal.
-        // Articles previously marked irrelevant (signal=null) get re-analyzed
-        // so Claude gets a second pass with the now-richer full-article snippet.
-        const urls = articles.map((a) => a.link)
+        // Check DB first so we can skip content fetching for already-analyzed URLs
         const { data: existing, error: dedupErr } = await serviceClient
           .from('analyzed_articles')
           .select('article_url, signal')
           .eq('ticker', stock.ticker)
-          .in('article_url', urls)
+          .gte('published_at', coverageStart.toISOString())
 
         if (dedupErr) console.error(`[${stock.ticker}] Dedup query error:`, dedupErr.message)
 
@@ -97,6 +89,10 @@ export async function POST(req: NextRequest) {
             .filter((r: { signal: string | null }) => r.signal !== null)
             .map((r: { article_url: string }) => r.article_url)
         )
+
+        // Pass seenUrls so fetchRssFeed skips expensive content fetching for known articles
+        const articles = await fetchRssFeed(stock.rssUrl, coverageStart, coverageEnd, seenUrls)
+        console.log(`[${stock.ticker}] RSS: ${articles.length} articles in window`)
 
         // Pre-filter: article title+snippet must contain at least one keyword for this stock
         const relevant = articles.filter((a) => {
