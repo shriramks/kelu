@@ -213,7 +213,7 @@ export async function analyzeArticle(
   }
 
   console.error(`  [analyzer] all providers failed for ${ticker}`)
-  return { relevant: false, signal: null, summary: null, isAnalystRec: false }
+  return { relevant: false, signal: null, summary: null, dipVerdict: null, isAnalystRec: false }
 }
 
 export async function synthesizeTicker(
