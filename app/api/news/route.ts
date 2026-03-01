@@ -66,10 +66,6 @@ export async function POST(req: NextRequest) {
 
   console.log(`[news] POST started — coverage: ${coverageStart.toISOString()} → ${coverageEnd.toISOString()}`)
 
-  // Track summaries of relevant articles per ticker (for synthesis)
-  const tickerRelevantSummaries: Record<string, string[]> = {}
-  for (const stock of STOCKS) tickerRelevantSummaries[stock.ticker] = []
-
   const allTasks: (() => Promise<void>)[] = []
 
   for (const stock of STOCKS) {
@@ -131,11 +127,6 @@ export async function POST(req: NextRequest) {
             seenEvents.push(article.title)
           }
 
-          // Collect summary for synthesis (signal+summary = relevant material article)
-          if (analysis.signal && analysis.summary) {
-            tickerRelevantSummaries[stock.ticker].push(`${analysis.signal} ${analysis.summary}`)
-          }
-
           const { error: upsertErr } = await serviceClient.from('analyzed_articles').upsert(
             {
               ticker: stock.ticker,
@@ -168,55 +159,8 @@ export async function POST(req: NextRequest) {
   if (runErr) console.error('[news] news_runs insert error:', runErr.message)
   else console.log('[news] news_run recorded')
 
-  // Synthesize one-liner for all tickers — run sequentially to avoid Groq rate limits
-  const synthTasks = STOCKS.map((stock) => async () => ({
-    ticker: stock.ticker,
-    summary: await synthesizeTicker(stock.ticker, stock.name, tickerRelevantSummaries[stock.ticker]),
-  }))
-  const synthResults = await pLimit(synthTasks, 1)
-  const tickerSummaries: Record<string, string> = {}
-  for (const r of synthResults) {
-    if (r) tickerSummaries[r.ticker] = r.summary
-  }
-
-  // Fetch material articles from DB for display
-  const { data: allRelevant } = await serviceClient
-    .from('analyzed_articles')
-    .select('*')
-    .gte('published_at', coverageStart.toISOString())
-    .lte('published_at', coverageEnd.toISOString())
-    .not('signal', 'is', null)
-    .order('published_at', { ascending: false })
-
-  const byTicker: Record<string, TickerResult> = {}
-  for (const stock of STOCKS) {
-    byTicker[stock.ticker] = {
-      ticker: stock.ticker,
-      tickerSummary: tickerSummaries[stock.ticker] ?? 'No news in coverage window.',
-      articles: [],
-    }
-  }
-
-  for (const row of allRelevant || []) {
-    if (byTicker[row.ticker]) {
-      byTicker[row.ticker].articles.push({
-        title: row.article_title,
-        url: row.article_url,
-        publishedAt: row.published_at,
-        summary: row.summary,
-        signal: row.signal,
-        dipVerdict: row.dip_verdict ?? null,
-        isAnalystRec: row.is_analyst_rec ?? false,
-      })
-    }
-  }
-
-  return NextResponse.json({
-    coverageStart: coverageStart.toISOString(),
-    coverageEnd: coverageEnd.toISOString(),
-    runAt: new Date().toISOString(),
-    tickers: Object.values(byTicker),
-  })
+  // POST only analyzes and stores — synthesis is done by GET to stay within timeout
+  return NextResponse.json({ done: true })
 }
 
 // GET: return cached results from last run

@@ -73,15 +73,21 @@ export default function Dashboard() {
     setRefreshing(true)
     setError(null)
     try {
-      const res = await fetch('/api/news', { method: 'POST' })
-      if (res.status === 401) {
+      // Step 1: analyze new articles and store to DB (~20-40s)
+      const postRes = await fetch('/api/news', { method: 'POST' })
+      if (postRes.status === 401) {
         router.push('/login')
         return
       }
-      if (!res.ok) {
-        throw new Error(`Server error: ${res.status}`)
+      if (!postRes.ok) {
+        throw new Error(`Server error: ${postRes.status}`)
       }
-      const json = await res.json()
+      // Step 2: fetch synthesized display data from DB (~20-25s)
+      const getRes = await fetch('/api/news')
+      if (!getRes.ok) {
+        throw new Error(`Server error: ${getRes.status}`)
+      }
+      const json = await getRes.json()
       setData(json)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to refresh news.')
