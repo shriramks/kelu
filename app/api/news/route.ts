@@ -118,8 +118,8 @@ export async function POST(req: NextRequest) {
           const titleWords = new Set(article.title.toLowerCase().split(/\W+/).filter((w) => w.length > 3))
           const isDuplicateTitle = seenTitles.some((seen) => {
             const seenWords = new Set(seen.toLowerCase().split(/\W+/).filter((w) => w.length > 3))
-            const intersection = [...titleWords].filter((w) => seenWords.has(w)).length
-            const union = new Set([...titleWords, ...seenWords]).size
+            const intersection = Array.from(titleWords).filter((w) => seenWords.has(w)).length
+            const union = new Set([...Array.from(titleWords), ...Array.from(seenWords)]).size
             return union > 0 && intersection / union > 0.5
           })
           if (isDuplicateTitle) {
