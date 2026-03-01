@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
   for (const stock of STOCKS) {
     allTasks.push(async () => {
       try {
-        // Check DB first so we can skip content fetching for already-analyzed URLs
+        // Check DB for already-analyzed URLs to skip re-analysis
         const { data: existing, error: dedupErr } = await serviceClient
           .from('analyzed_articles')
           .select('article_url, signal')
@@ -90,8 +90,7 @@ export async function POST(req: NextRequest) {
             .map((r: { article_url: string }) => r.article_url)
         )
 
-        // Pass seenUrls so fetchRssFeed skips expensive content fetching for known articles
-        const articles = await fetchRssFeed(stock.rssUrl, coverageStart, coverageEnd, seenUrls)
+        const articles = await fetchRssFeed(stock.rssUrl, coverageStart, coverageEnd)
         console.log(`[${stock.ticker}] RSS: ${articles.length} articles in window`)
 
         // Pre-filter: article title+snippet must contain at least one keyword for this stock
