@@ -53,8 +53,8 @@ Reply with JSON only — no prose:
 
 Signal guide:
 ✅ = net positive: order win, earnings beat, upgrade with target, regulatory tailwind, capacity expansion
-⚠️ = mixed or uncertain: soft quarter, unresolved headwind, analyst rec without data, minor governance concern
-❌ = red flag: fraud, auditor resignation, severe earnings miss, regulatory ban, promoter pledging at scale, structural demand collapse
+⚠️ = mixed or uncertain: soft quarter, analyst downgrade/sell rec, unresolved headwind, minor governance concern, stock price decline
+❌ = ONLY for thesis-breaking events: confirmed fraud, auditor resignation, SEBI ban, promoter pledging >50% stake, >30% earnings collapse with no recovery path. Do NOT use ❌ for analyst sell recs, stock price moves, or soft quarters.
 
 dip_verdict guide (only set if relevant=true):
 "accumulate" = fundamentals intact or improving, price dip is an opportunity (✅ news + temporary price weakness)
