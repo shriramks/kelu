@@ -70,7 +70,9 @@ function synthesisPrompt(ticker: string, tickerName: string, findings: string): 
 function parseAnalysis(text: string): AnalysisResult {
   const jsonMatch = text.match(/\{[\s\S]*\}/)
   if (!jsonMatch) return { relevant: false, signal: null, summary: null, dipVerdict: null, isAnalystRec: false }
-  const parsed = JSON.parse(jsonMatch[0])
+  // Models sometimes emit bare emoji as JSON values (e.g. "signal": ✅) which is invalid JSON
+  const normalized = jsonMatch[0].replace(/:\s*(✅|⚠️|❌)/g, ': "$1"')
+  const parsed = JSON.parse(normalized)
   return {
     relevant: Boolean(parsed.relevant),
     signal: parsed.signal as Signal | null,
@@ -82,35 +84,17 @@ function parseAnalysis(text: string): AnalysisResult {
 
 // ─── Provider implementations ─────────────────────────────────────────────────
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
 async function analyzeWithGroq(ticker: string, title: string, snippet: string, seenEvents: string[]): Promise<AnalysisResult> {
   const client = new Groq({ apiKey: process.env.GROQ_API_KEY })
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const response = await client.chat.completions.create({
-        model: 'llama-3.1-8b-instant', // 6000 RPM free tier vs 30 RPM for 70b
-        max_tokens: 400,
-        messages: [{ role: 'user', content: analysisPrompt(ticker, title, snippet, seenEvents) }],
-      })
-      const text = response.choices[0]?.message?.content ?? ''
-      const inputTokens = response.usage?.prompt_tokens
-      const outputTokens = response.usage?.completion_tokens
-      return { ...parseAnalysis(text), inputTokens, outputTokens, provider: 'groq' }
-    } catch (err) {
-      const msg = (err as Error).message
-      if (msg.includes('429') && attempt < 2) {
-        const wait = (attempt + 1) * 3000
-        console.warn(`  [groq] rate limited, retrying in ${wait / 1000}s...`)
-        await sleep(wait)
-      } else {
-        throw err
-      }
-    }
-  }
-  throw new Error('groq: max retries exceeded')
+  const response = await client.chat.completions.create({
+    model: 'llama-3.1-8b-instant', // 6000 RPM free tier vs 30 RPM for 70b
+    max_tokens: 400,
+    messages: [{ role: 'user', content: analysisPrompt(ticker, title, snippet, seenEvents) }],
+  })
+  const text = response.choices[0]?.message?.content ?? ''
+  const inputTokens = response.usage?.prompt_tokens
+  const outputTokens = response.usage?.completion_tokens
+  return { ...parseAnalysis(text), inputTokens, outputTokens, provider: 'groq' }
 }
 
 async function analyzeWithGemini(ticker: string, title: string, snippet: string, seenEvents: string[]): Promise<AnalysisResult> {
@@ -139,26 +123,12 @@ async function analyzeWithClaude(ticker: string, title: string, snippet: string,
 
 async function synthesizeWithGroq(prompt: string): Promise<string> {
   const client = new Groq({ apiKey: process.env.GROQ_API_KEY })
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const response = await client.chat.completions.create({
-        model: 'llama-3.1-8b-instant', // fast model for simple summarisation, higher rate limit
-        max_tokens: 80,
-        messages: [{ role: 'user', content: prompt }],
-      })
-      return response.choices[0]?.message?.content?.trim() ?? ''
-    } catch (err) {
-      const msg = (err as Error).message
-      if (msg.includes('429') && attempt < 2) {
-        const wait = (attempt + 1) * 3000
-        console.warn(`  [groq:synth] rate limited, retrying in ${wait / 1000}s...`)
-        await sleep(wait)
-      } else {
-        throw err
-      }
-    }
-  }
-  throw new Error('groq: max retries exceeded')
+  const response = await client.chat.completions.create({
+    model: 'llama-3.1-8b-instant', // fast model for simple summarisation, higher rate limit
+    max_tokens: 80,
+    messages: [{ role: 'user', content: prompt }],
+  })
+  return response.choices[0]?.message?.content?.trim() ?? ''
 }
 
 async function synthesizeWithGemini(prompt: string): Promise<string> {
@@ -181,7 +151,7 @@ async function synthesizeWithClaude(prompt: string): Promise<string> {
 
 // ─── Public API with fallback chain ──────────────────────────────────────────
 
-const PROVIDERS = ['groq', 'gemini', 'claude'] as const
+const PROVIDERS = ['groq'] as const // gemini + claude disabled (no credits)
 type Provider = typeof PROVIDERS[number]
 
 function isAvailable(provider: Provider): boolean {
