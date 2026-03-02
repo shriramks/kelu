@@ -34,6 +34,15 @@ CREATE TABLE IF NOT EXISTS news_runs (
 -- Migration: add ticker_summaries to existing news_runs table
 -- ALTER TABLE news_runs ADD COLUMN IF NOT EXISTS ticker_summaries jsonb;
 
+-- Table: ticker_synthesis
+-- Stores the latest AI-generated one-liner summary per ticker.
+-- Updated only when new signals are found, so repeated refreshes don't waste Groq quota.
+CREATE TABLE IF NOT EXISTS ticker_synthesis (
+  ticker      text PRIMARY KEY,
+  summary     text,
+  updated_at  timestamptz DEFAULT now()
+);
+
 -- Enable Row Level Security (optional but recommended)
 ALTER TABLE analyzed_articles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE news_runs ENABLE ROW LEVEL SECURITY;
@@ -49,5 +58,12 @@ CREATE POLICY "Authenticated users can read analyzed_articles"
 
 CREATE POLICY "Authenticated users can read news_runs"
   ON news_runs FOR SELECT
+  TO authenticated
+  USING (true);
+
+ALTER TABLE ticker_synthesis ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Authenticated users can read ticker_synthesis"
+  ON ticker_synthesis FOR SELECT
   TO authenticated
   USING (true);

@@ -47,6 +47,7 @@ export default function Dashboard() {
   const [data, setData] = useState<NewsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [refreshTicker, setRefreshTicker] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createSupabaseBrowserClient()
@@ -73,26 +74,34 @@ export default function Dashboard() {
     setRefreshing(true)
     setError(null)
     try {
-      // Step 1: analyze new articles and store to DB (~20-40s)
-      const postRes = await fetch('/api/news', { method: 'POST' })
-      if (postRes.status === 401) {
-        router.push('/login')
-        return
+      // One POST per ticker — each request handles max 5 articles, stays well under 60s
+      for (const stock of STOCKS) {
+        setRefreshTicker(stock.ticker)
+        const res = await fetch('/api/news', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticker: stock.ticker }),
+        })
+        if (res.status === 401) { router.push('/login'); return }
+        if (!res.ok) throw new Error(`Server error: ${res.status}`)
       }
-      if (!postRes.ok) {
-        throw new Error(`Server error: ${postRes.status}`)
-      }
-      // Step 2: fetch synthesized display data from DB (~20-25s)
+      // Final call: record the news_run timestamp
+      setRefreshTicker(null)
+      await fetch('/api/news', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      // Fetch display data
       const getRes = await fetch('/api/news')
-      if (!getRes.ok) {
-        throw new Error(`Server error: ${getRes.status}`)
-      }
+      if (!getRes.ok) throw new Error(`Server error: ${getRes.status}`)
       const json = await getRes.json()
       setData(json)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to refresh news.')
     } finally {
       setRefreshing(false)
+      setRefreshTicker(null)
     }
   }, [router])
 
@@ -149,7 +158,7 @@ export default function Dashboard() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Refreshing…
+                  {refreshTicker ? refreshTicker : 'Finishing…'}
                 </>
               ) : (
                 <>
