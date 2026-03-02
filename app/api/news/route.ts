@@ -49,6 +49,9 @@ type TickerResult = {
   articles: ArticleRow[]
 }
 
+// Stop analysis after this many ms — leaves room for synthesis before the 60s Vercel limit
+const ANALYSIS_BUDGET_MS = 30_000
+
 export async function POST(req: NextRequest) {
   // Verify session
   const supabase = createSupabaseServerClient()
@@ -63,8 +66,19 @@ export async function POST(req: NextRequest) {
 
   const serviceClient = createSupabaseServiceClient()
   const { start: coverageStart, end: coverageEnd } = getCoverageWindow()
+  const startedAt = Date.now()
 
   console.log(`[news] POST started — coverage: ${coverageStart.toISOString()} → ${coverageEnd.toISOString()}`)
+
+  // Read previous run's summaries so we can reuse them for tickers with no new signals
+  const { data: previousRun } = await serviceClient
+    .from('news_runs')
+    .select('ticker_summaries')
+    .order('run_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  const prevSummaries: Record<string, string> = previousRun?.ticker_summaries ?? {}
 
   // ── Phase 1: RSS fetch + DB dedup in parallel (no Groq, pure I/O) ──────────
   type PreparedTicker = {
@@ -116,6 +130,9 @@ export async function POST(req: NextRequest) {
   const prepared = await Promise.all(prepTasks.map((t) => t()))
 
   // ── Phase 2: Groq analysis — one ticker at a time ─────────────────────────
+  // Track which tickers get at least one new signal so we only re-synthesize those
+  const tickersWithNewSignals = new Set<string>()
+
   const analysisTasks = prepared
     .filter((p) => p.newArticles.length > 0)
     .map(({ ticker, newArticles }) => async () => {
@@ -123,6 +140,12 @@ export async function POST(req: NextRequest) {
       const seenEvents: string[] = []
 
       for (const article of newArticles) {
+        // Stop early if we're approaching the time budget — defer remaining to next refresh
+        if (Date.now() - startedAt > ANALYSIS_BUDGET_MS) {
+          console.log(`[${ticker}] analysis budget exceeded, deferring remaining articles`)
+          break
+        }
+
         // Title similarity pre-check — skip if >50% word overlap with an already-seen title
         const titleWords = new Set(article.title.toLowerCase().split(/\W+/).filter((w) => w.length > 3))
         const isDuplicateTitle = seenTitles.some((seen) => {
@@ -142,6 +165,9 @@ export async function POST(req: NextRequest) {
 
         if (analysis.relevant && analysis.summary) {
           seenEvents.push(article.title)
+        }
+        if (analysis.signal !== null) {
+          tickersWithNewSignals.add(ticker)
         }
 
         const { error: upsertErr } = await serviceClient.from('analyzed_articles').upsert(
@@ -163,7 +189,10 @@ export async function POST(req: NextRequest) {
 
   await pLimit(analysisTasks, 1)
 
-  // ── Phase 3: Synthesize all tickers and store with the run ─────────────────
+  // ── Phase 3: Synthesize only tickers with new signals; reuse cached for the rest ──
+  // Only tickers that received a new signal this run need a fresh Groq synthesis call.
+  // All others get their previous summary carried forward — avoids burning rate limit
+  // budget re-summarising unchanged tickers on every refresh.
   const { data: relevantAnalyzed } = await serviceClient
     .from('analyzed_articles')
     .select('ticker, signal, summary')
@@ -181,16 +210,24 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const synthTasks = STOCKS.map((stock) => async () => ({
-    ticker: stock.ticker,
-    summary: await synthesizeTicker(stock.ticker, stock.name, summariesByTicker[stock.ticker]),
-  }))
+  const synthTasks = STOCKS.map((stock) => async () => {
+    if (!tickersWithNewSignals.has(stock.ticker)) {
+      // No new signals this run — carry forward the previous summary
+      return { ticker: stock.ticker, summary: prevSummaries[stock.ticker] ?? 'No news in coverage window.' }
+    }
+    return {
+      ticker: stock.ticker,
+      summary: await synthesizeTicker(stock.ticker, stock.name, summariesByTicker[stock.ticker]),
+    }
+  })
   const synthResults = await pLimit(synthTasks, 1)
 
   const tickerSummaries: Record<string, string> = {}
   for (const r of synthResults) {
     if (r) tickerSummaries[r.ticker] = r.summary
   }
+
+  console.log(`[news] synthesized ${tickersWithNewSignals.size} tickers with new signals, reused cache for ${STOCKS.length - tickersWithNewSignals.size}`)
 
   // Record the run with cached synthesis — GET reads this directly, no Groq on page load
   const { error: runErr } = await serviceClient.from('news_runs').insert({
