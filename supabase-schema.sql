@@ -24,11 +24,15 @@ CREATE INDEX IF NOT EXISTS idx_analyzed_articles_published
 -- Table: news_runs
 -- Tracks each run for coverage window tracking
 CREATE TABLE IF NOT EXISTS news_runs (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  run_at          timestamptz DEFAULT now(),
-  coverage_start  timestamptz,
-  coverage_end    timestamptz
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  run_at            timestamptz DEFAULT now(),
+  coverage_start    timestamptz,
+  coverage_end      timestamptz,
+  ticker_summaries  jsonb         -- cached one-liner per ticker, keyed by ticker symbol
 );
+
+-- Migration: add ticker_summaries to existing news_runs table
+-- ALTER TABLE news_runs ADD COLUMN IF NOT EXISTS ticker_summaries jsonb;
 
 -- Enable Row Level Security (optional but recommended)
 ALTER TABLE analyzed_articles ENABLE ROW LEVEL SECURITY;
