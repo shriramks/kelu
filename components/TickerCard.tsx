@@ -24,6 +24,7 @@ interface TickerCardProps {
   ticker: string
   tickerSummary: string
   articles: Article[]
+  onRefresh?: () => Promise<void>
 }
 
 function formatIST(iso: string): string {
@@ -45,16 +46,28 @@ function getTopSignal(articles: Article[]): Signal | null {
   return null
 }
 
-export default function TickerCard({ ticker, tickerSummary, articles }: TickerCardProps) {
+export default function TickerCard({ ticker, tickerSummary, articles, onRefresh }: TickerCardProps) {
   const [expanded, setExpanded] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const stock = STOCKS.find((s) => s.ticker === ticker)
   const topSignal = getTopSignal(articles)
   const hasNews = articles.length > 0
   const cardBg = hasNews ? getSignalBg(topSignal) : 'bg-white border-gray-200'
 
+  const handleRefresh = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!onRefresh || isRefreshing) return
+    setIsRefreshing(true)
+    try {
+      await onRefresh()
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
   return (
     <div className={`rounded-xl border ${cardBg} transition-all`}>
-      {/* Header row — always visible, click to toggle */}
+      {/* Header row */}
       <button
         onClick={() => setExpanded((v) => !v)}
         className="w-full flex items-center justify-between px-5 py-4 text-left"
@@ -63,20 +76,14 @@ export default function TickerCard({ ticker, tickerSummary, articles }: TickerCa
           {/* Chevron */}
           <svg
             className={`h-4 w-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
 
           <div className="min-w-0">
             <span className="font-bold text-gray-900 text-sm">{ticker}</span>
-            {stock && (
-              <span className="ml-2 text-xs text-gray-500">{stock.name}</span>
-            )}
-            {/* One-liner shown in header when collapsed */}
+            {stock && <span className="ml-2 text-xs text-gray-500">{stock.name}</span>}
             {!expanded && tickerSummary && (
               <p className="text-xs text-gray-500 mt-0.5 truncate max-w-md">{tickerSummary}</p>
             )}
@@ -91,13 +98,33 @@ export default function TickerCard({ ticker, tickerSummary, articles }: TickerCa
           ) : (
             <span className="text-xs text-gray-400 italic">No material updates</span>
           )}
+
+          {/* Per-ticker refresh button */}
+          {onRefresh && (
+            <span
+              role="button"
+              onClick={handleRefresh}
+              title={`Refresh ${ticker}`}
+              className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
+                isRefreshing
+                  ? 'text-blue-500 bg-blue-50 cursor-not-allowed'
+                  : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50 cursor-pointer'
+              }`}
+            >
+              <svg
+                className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </span>
+          )}
         </div>
       </button>
 
       {/* Collapsible body */}
       {expanded && (
         <div className="px-5 pb-5 border-t border-gray-200">
-          {/* One-liner synthesis */}
           {tickerSummary && (
             <p className="text-sm text-gray-600 italic pt-3 pb-3 leading-snug">{tickerSummary}</p>
           )}
@@ -117,11 +144,6 @@ export default function TickerCard({ ticker, tickerSummary, articles }: TickerCa
                       >
                         {article.title}
                       </a>
-                      {article.isAnalystRec && (
-                        <span className="ml-2 inline-block text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium align-middle">
-                          Analyst Rec — verify independently
-                        </span>
-                      )}
                     </div>
                   </div>
                   <p className="text-sm text-gray-700 leading-relaxed ml-6">{article.summary}</p>

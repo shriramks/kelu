@@ -30,6 +30,8 @@ interface NewsData {
   noData?: boolean
 }
 
+type RefreshStatus = { ticker: string; done: number; total: number }
+
 function formatIST(iso: string): string {
   const date = new Date(iso)
   return date.toLocaleString('en-IN', {
@@ -43,11 +45,27 @@ function formatIST(iso: string): string {
   })
 }
 
+async function postTicker(ticker: string): Promise<Response> {
+  return fetch('/api/news', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ticker }),
+  })
+}
+
+async function recordRun(): Promise<void> {
+  await fetch('/api/news', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  })
+}
+
 export default function Dashboard() {
   const [data, setData] = useState<NewsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [refreshTicker, setRefreshTicker] = useState<string | null>(null)
+  const [refreshStatus, setRefreshStatus] = useState<RefreshStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createSupabaseBrowserClient()
@@ -57,10 +75,7 @@ export default function Dashboard() {
     setError(null)
     try {
       const res = await fetch('/api/news')
-      if (res.status === 401) {
-        router.push('/login')
-        return
-      }
+      if (res.status === 401) { router.push('/login'); return }
       const json = await res.json()
       setData(json)
     } catch {
@@ -70,40 +85,51 @@ export default function Dashboard() {
     }
   }, [router])
 
+  const reloadData = useCallback(async () => {
+    const res = await fetch('/api/news')
+    if (!res.ok) throw new Error(`Server error: ${res.status}`)
+    const json = await res.json()
+    setData(json)
+  }, [])
+
+  // Refresh a single ticker — called from the per-card refresh button
+  const refreshSingleTicker = useCallback(async (ticker: string) => {
+    setRefreshStatus({ ticker, done: 0, total: 1 })
+    setError(null)
+    try {
+      const res = await postTicker(ticker)
+      if (res.status === 401) { router.push('/login'); return }
+      if (!res.ok) throw new Error(`Server error: ${res.status}`)
+      await recordRun()
+      await reloadData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to refresh.')
+    } finally {
+      setRefreshStatus(null)
+    }
+  }, [router, reloadData])
+
+  // Refresh all tickers sequentially
   const refresh = useCallback(async () => {
     setRefreshing(true)
     setError(null)
     try {
-      // One POST per ticker — each request handles max 5 articles, stays well under 60s
-      for (const stock of STOCKS) {
-        setRefreshTicker(stock.ticker)
-        const res = await fetch('/api/news', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ticker: stock.ticker }),
-        })
+      for (let i = 0; i < STOCKS.length; i++) {
+        setRefreshStatus({ ticker: STOCKS[i].ticker, done: i, total: STOCKS.length })
+        const res = await postTicker(STOCKS[i].ticker)
         if (res.status === 401) { router.push('/login'); return }
         if (!res.ok) throw new Error(`Server error: ${res.status}`)
       }
-      // Final call: record the news_run timestamp
-      setRefreshTicker(null)
-      await fetch('/api/news', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-      // Fetch display data
-      const getRes = await fetch('/api/news')
-      if (!getRes.ok) throw new Error(`Server error: ${getRes.status}`)
-      const json = await getRes.json()
-      setData(json)
+      setRefreshStatus(null)
+      await recordRun()
+      await reloadData()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to refresh news.')
     } finally {
       setRefreshing(false)
-      setRefreshTicker(null)
+      setRefreshStatus(null)
     }
-  }, [router])
+  }, [router, reloadData])
 
   useEffect(() => {
     loadCached()
@@ -114,13 +140,11 @@ export default function Dashboard() {
     router.push('/login')
   }
 
-  // Sort tickers: ones with news first, then those without
   const sortedTickers = data?.tickers
     ? [...data.tickers].sort((a, b) => {
         const aHas = a.articles.length > 0 ? 1 : 0
         const bHas = b.articles.length > 0 ? 1 : 0
         if (bHas !== aHas) return bHas - aHas
-        // Sort by worst signal first within each group
         const signalOrder = (t: TickerData) => {
           if (t.articles.some((a) => a.signal === '❌')) return 0
           if (t.articles.some((a) => a.signal === '⚠️')) return 1
@@ -132,6 +156,7 @@ export default function Dashboard() {
     : STOCKS.map((s) => ({ ticker: s.ticker, tickerSummary: '', articles: [] }))
 
   const withNewsCount = data?.tickers?.filter((t) => t.articles.length > 0).length ?? 0
+  const progressPct = refreshStatus ? Math.round((refreshStatus.done / refreshStatus.total) * 100) : 0
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -139,35 +164,19 @@ export default function Dashboard() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-lg font-bold text-gray-900 tracking-tight">
-              Stock News
-            </h1>
-            <span className="text-xs text-gray-400 hidden sm:block">
-              Financial News Dashboard
-            </span>
+            <h1 className="text-lg font-bold text-gray-900 tracking-tight">Stock News</h1>
+            <span className="text-xs text-gray-400 hidden sm:block">Financial News Dashboard</span>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={refresh}
-              disabled={refreshing || loading}
+              disabled={refreshing || !!refreshStatus || loading}
               className="px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
             >
-              {refreshing ? (
-                <>
-                  <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  {refreshTicker ? refreshTicker : 'Finishing…'}
-                </>
-              ) : (
-                <>
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh
-                </>
-              )}
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh All
             </button>
             <button
               onClick={handleSignOut}
@@ -177,6 +186,36 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
+
+        {/* Fetch status bar — visible during any refresh */}
+        {refreshStatus && (
+          <div className="bg-blue-600 text-white">
+            <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center gap-3">
+              <svg className="animate-spin h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <span className="text-sm font-semibold flex-shrink-0">
+                {refreshStatus.total === 1
+                  ? `Refreshing ${refreshStatus.ticker}…`
+                  : `Analyzing ${refreshStatus.ticker}`}
+              </span>
+              {refreshStatus.total > 1 && (
+                <>
+                  <div className="flex-1 bg-blue-500 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-white rounded-full h-2 transition-all duration-500"
+                      style={{ width: `${progressPct}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-blue-200 font-mono flex-shrink-0 tabular-nums">
+                    {refreshStatus.done}/{refreshStatus.total}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6">
@@ -184,17 +223,13 @@ export default function Dashboard() {
         {!loading && data && !data.noData && (
           <div className="mb-6 bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap gap-4 items-center justify-between">
             <div className="space-y-0.5">
-              <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">
-                Coverage Window
-              </p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Coverage Window</p>
               <p className="text-sm text-gray-800 font-medium">
                 {formatIST(data.coverageStart)} → {formatIST(data.coverageEnd)}
               </p>
             </div>
             <div className="space-y-0.5 text-right">
-              <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">
-                Last Run
-              </p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Last Run</p>
               <p className="text-sm text-gray-800">{formatIST(data.runAt)}</p>
             </div>
             <div className="flex gap-4 text-sm">
@@ -239,9 +274,7 @@ export default function Dashboard() {
         {!loading && data?.noData && (
           <div className="text-center py-16">
             <p className="text-gray-500 text-lg mb-4">No data yet.</p>
-            <p className="text-gray-400 text-sm mb-6">
-              Click Refresh to fetch and analyze the latest news.
-            </p>
+            <p className="text-gray-400 text-sm mb-6">Click Refresh All to fetch and analyze the latest news.</p>
             <button
               onClick={refresh}
               disabled={refreshing}
@@ -252,7 +285,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Cards — single column */}
+        {/* Cards */}
         {!loading && data && !data.noData && (
           <div className="flex flex-col gap-3">
             {sortedTickers.map((t) => (
@@ -261,6 +294,7 @@ export default function Dashboard() {
                 ticker={t.ticker}
                 tickerSummary={t.tickerSummary}
                 articles={t.articles}
+                onRefresh={refreshing || !!refreshStatus ? undefined : () => refreshSingleTicker(t.ticker)}
               />
             ))}
           </div>
