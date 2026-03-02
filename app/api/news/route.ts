@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
         const filtered = articles.length - relevant.length
         if (filtered > 0) console.log(`[${stock.ticker}] pre-filter removed ${filtered} off-topic articles`)
 
-        const newArticles = relevant.filter((a) => !seenUrls.has(a.link))
+        const newArticles = relevant.filter((a) => !seenUrls.has(a.link)).slice(0, 5)
         console.log(`[${stock.ticker}] ${newArticles.length} to analyze (${seenUrls.size} already have a signal)`)
 
         // Track seen events per ticker this run for dedup
@@ -148,8 +148,8 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  // Fetch + analyze all tickers — llama-3.1-8b-instant has 6000 RPM, concurrency 4 is safe
-  await pLimit(allTasks, 4)
+  // Concurrency 1: one ticker at a time to stay within Groq free tier burst limit
+  await pLimit(allTasks, 1)
 
   // Record the run
   const { error: runErr } = await serviceClient.from('news_runs').insert({
