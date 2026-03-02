@@ -151,7 +151,7 @@ async function synthesizeWithClaude(prompt: string): Promise<string> {
 
 // ─── Public API with fallback chain ──────────────────────────────────────────
 
-const PROVIDERS = ['groq'] as const // gemini + claude disabled (no credits)
+const PROVIDERS = ['gemini', 'groq'] as const // gemini primary, groq fallback; claude disabled (no credits)
 type Provider = typeof PROVIDERS[number]
 
 function isAvailable(provider: Provider): boolean {
