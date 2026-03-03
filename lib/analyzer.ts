@@ -104,7 +104,7 @@ async function analyzeWithGroq(ticker: string, tickerName: string, context: stri
 async function analyzeWithGemini(ticker: string, tickerName: string, context: string, title: string, snippet: string, seenEvents: string[]): Promise<AnalysisResult> {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash-lite',
+    model: 'gemini-2.5-flash',
     systemInstruction: SYSTEM_PROMPT,
   })
   const result = await model.generateContent(analysisPrompt(ticker, tickerName, context, title, snippet, seenEvents))
@@ -141,7 +141,7 @@ async function synthesizeWithGroq(prompt: string): Promise<string> {
 
 async function synthesizeWithGemini(prompt: string): Promise<string> {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
   const result = await model.generateContent(prompt)
   return result.response.text().trim()
 }
