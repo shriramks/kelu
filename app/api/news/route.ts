@@ -83,14 +83,7 @@ export async function POST(req: NextRequest) {
 
   console.log(`[${ticker}] RSS: ${articles.length} articles in window`)
 
-  const relevant = articles.filter((a) => {
-    const haystack = (a.title + ' ' + a.snippet).toLowerCase()
-    return stock.keywords.some((kw) => haystack.includes(kw.toLowerCase()))
-  })
-  const filtered = articles.length - relevant.length
-  if (filtered > 0) console.log(`[${ticker}] pre-filter removed ${filtered} off-topic articles`)
-
-  const newArticles = relevant.filter((a) => !seenUrls.has(a.link)).slice(0, 5)
+  const newArticles = articles.filter((a) => !seenUrls.has(a.link)).slice(0, 5)
   console.log(`[${ticker}] ${newArticles.length} to analyze (${seenUrls.size} already have a signal)`)
 
   const seenTitles: string[] = []
@@ -111,7 +104,7 @@ export async function POST(req: NextRequest) {
     }
     seenTitles.push(article.title)
 
-    const analysis = await analyzeArticle(ticker, article.title, article.snippet, seenEvents)
+    const analysis = await analyzeArticle(ticker, stock.name, stock.context, article.title, article.snippet, seenEvents)
     console.log(`[${ticker}] "${article.title.slice(0, 60)}" → relevant=${analysis.relevant} signal=${analysis.signal}`)
 
     if (analysis.relevant && analysis.summary) seenEvents.push(article.title)

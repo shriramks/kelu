@@ -16,35 +16,36 @@ export interface AnalysisResult {
   provider?: string
 }
 
+// ─── System prompt (overall analyst persona) ──────────────────────────────────
+
+const SYSTEM_PROMPT = `You are a financial news analyst for a long-term Indian equity investor. Your job is to filter RSS news feeds and surface only what is materially relevant to investment decisions — not what makes headlines.
+
+You think like a portfolio manager, not a journalist. You care about:
+- Signals that change the long-term earnings trajectory of a business
+- Governance, regulatory, or structural risks that could permanently impair value
+- Catalysts — positive or negative — that a rational long-term investor would act on
+
+You do NOT care about:
+- Daily price movements or technical analysis
+- Macro commentary unless it directly and specifically impacts a holding
+- Recycled news, opinion without data, or analyst targets without reasoning
+- PR fluff from company IR teams unless backed by numbers
+
+You will be given a stock's investment thesis and signals to watch. Match incoming news against these criteria and reply with JSON only.`
+
 // ─── Shared prompt builders ───────────────────────────────────────────────────
 
-function analysisPrompt(ticker: string, title: string, snippet: string, seenEvents: string[]): string {
+function analysisPrompt(ticker: string, tickerName: string, context: string, title: string, snippet: string, seenEvents: string[]): string {
   const dupeBlock = seenEvents.length > 0
-    ? `\nALREADY COVERED EVENTS for ${ticker} this session — mark relevant=false if this article is about the same event (even if worded differently):\n${seenEvents.map((e, i) => `${i + 1}. ${e}`).join('\n')}\n`
+    ? `\nALREADY COVERED EVENTS for ${ticker} this session — mark relevant=false if this article covers the same event (even if worded differently):\n${seenEvents.map((e, i) => `${i + 1}. ${e}`).join('\n')}\n`
     : ''
 
-  return `You are a buy-side equity analyst covering Indian stocks. A portfolio manager is holding ${ticker} long-term and wants to know if this article changes their view or gives them an informational edge.
+  return `Stock: ${ticker} — ${tickerName}
 
-FIRST CHECK — is ${ticker} the primary subject?
-The article must be MAINLY about ${ticker} or its direct business. If ${ticker} is only briefly mentioned, is one of many companies listed, or is a minor party (e.g. "among companies affected by..."), mark relevant=false immediately. Do not analyse further.
+Investment thesis and signals to watch:
+${context}
 ${dupeBlock}
-MATERIAL (mark relevant=true):
-- Earnings, revenue, margins, PAT — actual results or pre-announced numbers
-- Order wins, contract awards, capacity additions, new product launches
-- Analyst upgrades/downgrades WITH a price target or stated reason
-- M&A, stake sale, promoter buying/selling, block deals
-- Regulatory approvals, government policy that directly benefits/hurts the sector
-- Guidance changes, management commentary on growth outlook
-- Auditor issues, governance red flags, litigation with financial impact
-- Macro/sector news that materially shifts the investment thesis (e.g. budget allocation for defence, FMCG rural demand data)
-
-NOT MATERIAL (mark relevant=false):
-- ${ticker} is a minor mention or one of many companies in a roundup
-- Pure price move articles ("${ticker} rises 2% today") with no fundamental reason
-- Generic market roundups where ${ticker} is briefly mentioned
-- Duplicate or follow-up articles restating already-known news
-- Analyst recs with no reasoning, target, or new data ("analysts bullish on ${ticker}")
-
+Article to analyse:
 Title: ${title}
 Content: ${snippet.slice(0, 1200)}
 
@@ -53,13 +54,13 @@ Reply with JSON only — no prose:
 
 Signal guide:
 ✅ = net positive: order win, earnings beat, upgrade with target, regulatory tailwind, capacity expansion
-⚠️ = mixed or uncertain: soft quarter, analyst downgrade/sell rec, unresolved headwind, minor governance concern, stock price decline
-❌ = ONLY for thesis-breaking events: confirmed fraud, auditor resignation, SEBI ban, promoter pledging >50% stake, >30% earnings collapse with no recovery path. Do NOT use ❌ for analyst sell recs, stock price moves, or soft quarters.
+⚠️ = mixed or uncertain: soft quarter, downgrade, unresolved headwind, minor governance concern
+❌ = ONLY for thesis-breakers listed above. Do NOT use ❌ for analyst sell recs, price moves, or soft quarters.
 
-dip_verdict guide (only set if relevant=true):
-"accumulate" = fundamentals intact or improving, price dip is an opportunity (✅ news + temporary price weakness)
+dip_verdict guide (only if relevant=true):
+"accumulate" = fundamentals intact or improving, price dip is an opportunity
 "hold" = no new reason to add or reduce, thesis unchanged
-"monitor" = something to watch but not act on yet — wait for next quarter or management clarification
+"monitor" = something to watch but not act on yet
 "avoid" = thesis at risk or broken, do not add on dips`
 }
 
@@ -84,12 +85,15 @@ function parseAnalysis(text: string): AnalysisResult {
 
 // ─── Provider implementations ─────────────────────────────────────────────────
 
-async function analyzeWithGroq(ticker: string, title: string, snippet: string, seenEvents: string[]): Promise<AnalysisResult> {
+async function analyzeWithGroq(ticker: string, tickerName: string, context: string, title: string, snippet: string, seenEvents: string[]): Promise<AnalysisResult> {
   const client = new Groq({ apiKey: process.env.GROQ_API_KEY })
   const response = await client.chat.completions.create({
-    model: 'llama-3.1-8b-instant', // 6000 RPM free tier vs 30 RPM for 70b
+    model: 'llama-3.1-8b-instant',
     max_tokens: 400,
-    messages: [{ role: 'user', content: analysisPrompt(ticker, title, snippet, seenEvents) }],
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: analysisPrompt(ticker, tickerName, context, title, snippet, seenEvents) },
+    ],
   })
   const text = response.choices[0]?.message?.content ?? ''
   const inputTokens = response.usage?.prompt_tokens
@@ -97,22 +101,26 @@ async function analyzeWithGroq(ticker: string, title: string, snippet: string, s
   return { ...parseAnalysis(text), inputTokens, outputTokens, provider: 'groq' }
 }
 
-async function analyzeWithGemini(ticker: string, title: string, snippet: string, seenEvents: string[]): Promise<AnalysisResult> {
+async function analyzeWithGemini(ticker: string, tickerName: string, context: string, title: string, snippet: string, seenEvents: string[]): Promise<AnalysisResult> {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
-  const result = await model.generateContent(analysisPrompt(ticker, title, snippet, seenEvents))
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash-lite',
+    systemInstruction: SYSTEM_PROMPT,
+  })
+  const result = await model.generateContent(analysisPrompt(ticker, tickerName, context, title, snippet, seenEvents))
   const text = result.response.text()
   const inputTokens = result.response.usageMetadata?.promptTokenCount
   const outputTokens = result.response.usageMetadata?.candidatesTokenCount
   return { ...parseAnalysis(text), inputTokens, outputTokens, provider: 'gemini' }
 }
 
-async function analyzeWithClaude(ticker: string, title: string, snippet: string, seenEvents: string[]): Promise<AnalysisResult> {
+async function analyzeWithClaude(ticker: string, tickerName: string, context: string, title: string, snippet: string, seenEvents: string[]): Promise<AnalysisResult> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 256,
-    messages: [{ role: 'user', content: analysisPrompt(ticker, title, snippet, seenEvents) }],
+    system: SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: analysisPrompt(ticker, tickerName, context, title, snippet, seenEvents) }],
   })
   const content = response.content[0]
   const text = content.type === 'text' ? content.text : ''
@@ -124,7 +132,7 @@ async function analyzeWithClaude(ticker: string, title: string, snippet: string,
 async function synthesizeWithGroq(prompt: string): Promise<string> {
   const client = new Groq({ apiKey: process.env.GROQ_API_KEY })
   const response = await client.chat.completions.create({
-    model: 'llama-3.1-8b-instant', // fast model for simple summarisation, higher rate limit
+    model: 'llama-3.1-8b-instant',
     max_tokens: 80,
     messages: [{ role: 'user', content: prompt }],
   })
@@ -163,6 +171,8 @@ function isAvailable(provider: Provider): boolean {
 
 export async function analyzeArticle(
   ticker: string,
+  tickerName: string,
+  context: string,
   title: string,
   snippet: string,
   seenEvents: string[] = []
@@ -171,9 +181,9 @@ export async function analyzeArticle(
     if (!isAvailable(provider)) continue
     try {
       let result: AnalysisResult
-      if (provider === 'groq') result = await analyzeWithGroq(ticker, title, snippet, seenEvents)
-      else if (provider === 'gemini') result = await analyzeWithGemini(ticker, title, snippet, seenEvents)
-      else result = await analyzeWithClaude(ticker, title, snippet, seenEvents)
+      if (provider === 'groq') result = await analyzeWithGroq(ticker, tickerName, context, title, snippet, seenEvents)
+      else if (provider === 'gemini') result = await analyzeWithGemini(ticker, tickerName, context, title, snippet, seenEvents)
+      else result = await analyzeWithClaude(ticker, tickerName, context, title, snippet, seenEvents)
 
       console.log(`  [${provider}] tokens in=${result.inputTokens} out=${result.outputTokens} relevant=${result.relevant} signal=${result.signal}`)
       return result
