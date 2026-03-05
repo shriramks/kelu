@@ -83,7 +83,19 @@ export async function POST(req: NextRequest) {
 
   console.log(`[${ticker}] RSS: ${articles.length} articles in window`)
 
-  const newArticles = articles.filter((a) => !seenUrls.has(a.link)).slice(0, 5)
+  // Sort: articles mentioning the company name in the title come first,
+  // so the 5-article cap doesn't waste slots on generic market roundups.
+  const namePrefix = stock.name.toLowerCase().split(' ').slice(0, 2).join(' ')
+  const tickerLower = ticker.toLowerCase()
+  const sortedArticles = [...articles].sort((a, b) => {
+    const aTitle = a.title.toLowerCase()
+    const bTitle = b.title.toLowerCase()
+    const aScore = (aTitle.includes(namePrefix) || aTitle.includes(tickerLower)) ? 1 : 0
+    const bScore = (bTitle.includes(namePrefix) || bTitle.includes(tickerLower)) ? 1 : 0
+    return bScore - aScore
+  })
+
+  const newArticles = sortedArticles.filter((a) => !seenUrls.has(a.link)).slice(0, 5)
   console.log(`[${ticker}] ${newArticles.length} to analyze (${seenUrls.size} already have a signal)`)
 
   const seenTitles: string[] = []
