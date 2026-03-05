@@ -18,50 +18,46 @@ export interface AnalysisResult {
 
 // ─── System prompt (overall analyst persona) ──────────────────────────────────
 
-const SYSTEM_PROMPT = `You are a financial news analyst for a long-term Indian equity investor. Your job is to filter RSS news feeds and surface only what is materially relevant to investment decisions — not what makes headlines.
+const SYSTEM_PROMPT = `You are a portfolio manager reviewing news for a long-term Indian equity investor. You think like someone who needs to decide: "does this change anything about my position?"
 
-You think like a portfolio manager, not a journalist. You care about:
-- Signals that change the long-term earnings trajectory of a business
-- Governance, regulatory, or structural risks that could permanently impair value
-- Catalysts — positive or negative — that a rational long-term investor would act on
+You already know these businesses well. No need for sector background or company introductions.
+
+Your job per article:
+- Is this specifically about the company's business, financials, management, or regulation?
+- If yes, is it positive, negative, or worth monitoring?
+- Surface it. If no, discard it.
+
+You care about:
+- Earnings, guidance, order wins/losses, regulatory actions, management changes
+- Analyst calls that are specific and reasoned (not just target price changes)
+- Sector news that directly names the company or materially affects its core business
 
 You do NOT care about:
-- Daily price movements or technical analysis
-- Macro commentary unless it directly and specifically impacts a holding
-- Recycled news, opinion without data, or analyst targets without reasoning
-- PR fluff from company IR teams unless backed by numbers
-
-You will be given a stock's investment thesis and signals to watch. Match incoming news against these criteria and reply with JSON only.`
+- Price movements, technical levels, 52-week highs/lows
+- "Stocks to watch" roundups where this is one of 5+ tickers
+- Broad Sensex/Nifty market commentary
+- Recycled PR or IR fluff without new data`
 
 // ─── Shared prompt builders ───────────────────────────────────────────────────
 
 function analysisPrompt(ticker: string, tickerName: string, context: string, title: string, snippet: string, seenEvents: string[]): string {
   const dupeBlock = seenEvents.length > 0
-    ? `\nALREADY COVERED EVENTS for ${ticker} this session — mark relevant=false if this article covers the same event (even if worded differently):\n${seenEvents.map((e, i) => `${i + 1}. ${e}`).join('\n')}\n`
+    ? `\nALREADY COVERED EVENTS this session — mark relevant=false if this covers the same event:\n${seenEvents.map((e, i) => `${i + 1}. ${e}`).join('\n')}\n`
     : ''
 
-  return `Stock: ${ticker} — ${tickerName}
-
-Investment thesis and signals to watch:
+  return `Stock: ${ticker} (${tickerName})
 ${context}
 ${dupeBlock}
-Article to analyse:
 Title: ${title}
-Content: ${snippet.slice(0, 1200)}
+Content: ${snippet.slice(0, 800)}
 
-Reply with JSON only — no prose:
-{"relevant":bool,"signal":"✅"|"⚠️"|"❌"|null,"summary":"2 sentences: first states the key fact with any number/%, second states why it matters for a long-term holder"|null,"dip_verdict":"accumulate"|"hold"|"avoid"|"monitor"|null,"is_analyst_rec":bool}
+Reply with JSON only:
+{"relevant":bool,"signal":"✅"|"⚠️"|"❌"|null,"summary":"2 sentences: key fact with number/%, then why it matters"|null,"dip_verdict":"accumulate"|"hold"|"avoid"|"monitor"|null,"is_analyst_rec":bool}
 
-Signal guide:
-✅ = net positive: order win, earnings beat, upgrade with target, regulatory tailwind, capacity expansion
-⚠️ = mixed or uncertain: soft quarter, downgrade, unresolved headwind, minor governance concern
-❌ = ONLY for thesis-breakers listed above. Do NOT use ❌ for analyst sell recs, price moves, or soft quarters.
-
-dip_verdict guide (only if relevant=true):
-"accumulate" = fundamentals intact or improving, price dip is an opportunity
-"hold" = no new reason to add or reduce, thesis unchanged
-"monitor" = something to watch but not act on yet
-"avoid" = thesis at risk or broken, do not add on dips`
+✅ = positive: order win, earnings beat, specific upgrade, regulatory tailwind
+⚠️ = mixed/watch: soft results, downgrade, unresolved risk, governance concern
+❌ = serious adverse: fraud, ban, >30% earnings collapse, thesis-breaking event
+dip_verdict only if relevant=true`
 }
 
 function synthesisPrompt(ticker: string, tickerName: string, findings: string): string {

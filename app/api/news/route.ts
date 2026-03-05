@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase-server'
 import { STOCKS } from '@/lib/stocks'
-import { fetchRssFeed } from '@/lib/rss'
+import { fetchRssFeed, fetchMetaDescription } from '@/lib/rss'
 import { analyzeArticle, synthesizeTicker } from '@/lib/analyzer'
 
 // 24-hour rolling coverage window
@@ -98,11 +98,18 @@ export async function POST(req: NextRequest) {
   const newArticles = sortedArticles.filter((a) => !seenUrls.has(a.link)).slice(0, 5)
   console.log(`[${ticker}] ${newArticles.length} to analyze (${seenUrls.size} already have a signal)`)
 
+  // Fetch meta descriptions in parallel for all articles before analysis
+  const metaDescs = await Promise.all(
+    newArticles.map((a) => fetchMetaDescription(a.realUrl))
+  )
+
   const seenTitles: string[] = []
   const seenEvents: string[] = []
   let newSignalFound = false
 
-  for (const article of newArticles) {
+  for (let idx = 0; idx < newArticles.length; idx++) {
+    const article = { ...newArticles[idx], snippet: metaDescs[idx] || newArticles[idx].snippet }
+    console.log(`[${ticker}] snippet source: ${metaDescs[idx] ? `meta(${metaDescs[idx]!.length}c)` : `rss(${newArticles[idx].snippet.length}c)`}`)
     const titleWords = new Set(article.title.toLowerCase().split(/\W+/).filter((w) => w.length > 3))
     const isDuplicate = seenTitles.some((seen) => {
       const seenWords = new Set(seen.toLowerCase().split(/\W+/).filter((w) => w.length > 3))

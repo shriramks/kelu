@@ -41,6 +41,60 @@ function extractRealUrl(googleUrl: string): string {
   }
 }
 
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+}
+
+// Fetch the og:description or meta description from an article URL.
+// Returns null on timeout, error, or if no tag found.
+export async function fetchMetaDescription(url: string, timeoutMs = 3000): Promise<string | null> {
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)' },
+    })
+    clearTimeout(timer)
+    if (!res.ok) return null
+
+    // Read only the first 50KB — enough to contain <head>
+    const reader = res.body?.getReader()
+    if (!reader) return null
+    let html = ''
+    while (html.length < 51200) {
+      const { done, value } = await reader.read()
+      if (done) break
+      html += new TextDecoder().decode(value)
+      if (html.includes('</head>')) break
+    }
+    reader.cancel()
+
+    // Try og:description first (usually more informative), then name=description
+    for (const attr of ['og:description', 'description']) {
+      const withContentFirst = new RegExp(
+        `<meta[^>]+content=["']([^"']{20,}?)["'][^>]+(?:property|name)=["']${attr}["']`,
+        'i'
+      )
+      const withAttrFirst = new RegExp(
+        `<meta[^>]+(?:property|name)=["']${attr}["'][^>]+content=["']([^"']{20,}?)["']`,
+        'i'
+      )
+      const m = html.match(withAttrFirst) || html.match(withContentFirst)
+      if (m?.[1]) return decodeHtmlEntities(m[1].trim())
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
 export async function fetchRssFeed(
   url: string,
   coverageStart: Date,
