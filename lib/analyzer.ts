@@ -60,8 +60,19 @@ Reply with JSON only:
 dip_verdict only if relevant=true`
 }
 
+export interface ArticleForSynthesis {
+  signal: string
+  summary: string
+  title: string
+}
+
 function synthesisPrompt(ticker: string, tickerName: string, findings: string): string {
-  return `You are summarizing analyst findings on ${ticker} (${tickerName}) for a portfolio manager.\n\nFindings from material articles:\n${findings}\n\nWrite ONE sentence (max 30 words) capturing the most important development. Include a key number (%, ₹ crore) if present. If mixed signals, note the dominant theme. One sentence only:`
+  return `You are briefing a portfolio manager on ${ticker} (${tickerName}).
+
+Relevant developments:
+${findings}
+
+Write 2-4 sentences of plain prose. Lead with the most important signal. Group related events into one point (e.g. multiple reports of the same crash = one sentence). Include key numbers (₹ crore, %). No bullet points, no headers, no source references. Direct and specific.`
 }
 
 function parseAnalysis(text: string): AnalysisResult {
@@ -194,11 +205,13 @@ export async function analyzeArticle(
 export async function synthesizeTicker(
   ticker: string,
   tickerName: string,
-  summaries: string[]  // AI-generated summaries of relevant articles, not raw titles
+  articles: ArticleForSynthesis[]
 ): Promise<string> {
-  if (summaries.length === 0) return 'No material news in the past 24 hours.'
+  if (articles.length === 0) return 'No material news in the past 24 hours.'
 
-  const findings = summaries.slice(0, 8).map((s, i) => `${i + 1}. ${s}`).join('\n')
+  const findings = articles.slice(0, 10).map((a, i) =>
+    `${i + 1}. ${a.signal} ${a.summary} [${a.title.slice(0, 70)}]`
+  ).join('\n')
   const prompt = synthesisPrompt(ticker, tickerName, findings)
 
   for (const provider of PROVIDERS) {

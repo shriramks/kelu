@@ -20,6 +20,15 @@ const DIP_VERDICT_STYLE: Record<string, { label: string; classes: string }> = {
   avoid:      { label: 'Avoid adding',      classes: 'bg-red-100 text-red-700' },
 }
 
+// Pick the most actionable dip verdict across all articles
+const VERDICT_PRIORITY = ['accumulate', 'avoid', 'monitor', 'hold']
+function getTopDipVerdict(articles: Article[]): string | null {
+  for (const v of VERDICT_PRIORITY) {
+    if (articles.some((a) => a.dipVerdict === v)) return v
+  }
+  return null
+}
+
 interface TickerCardProps {
   ticker: string
   tickerSummary: string
@@ -53,6 +62,7 @@ export default function TickerCard({ ticker, tickerSummary, articles, onRefresh 
   const topSignal = getTopSignal(articles)
   const hasNews = articles.length > 0
   const cardBg = hasNews ? getSignalBg(topSignal) : 'bg-white border-gray-200'
+  const topDipVerdict = getTopDipVerdict(articles)
 
   const handleRefresh = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -73,18 +83,16 @@ export default function TickerCard({ ticker, tickerSummary, articles, onRefresh 
         className="w-full flex items-center justify-between px-5 py-4 text-left"
       >
         <div className="flex items-center gap-3 min-w-0">
-          {/* Chevron */}
           <svg
             className={`h-4 w-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
-
           <div className="min-w-0">
             <span className="font-bold text-gray-900 text-sm">{ticker}</span>
             {stock && <span className="ml-2 text-xs text-gray-500">{stock.name}</span>}
-            {!expanded && tickerSummary && (
+            {!expanded && tickerSummary && hasNews && (
               <p className="text-xs text-gray-500 mt-0.5 truncate max-w-md">{tickerSummary}</p>
             )}
           </div>
@@ -93,13 +101,12 @@ export default function TickerCard({ ticker, tickerSummary, articles, onRefresh 
         <div className="flex items-center gap-2 flex-shrink-0 ml-3">
           {hasNews && topSignal ? (
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getSignalBadge(topSignal)}`}>
-              {topSignal} {articles.length} update{articles.length !== 1 ? 's' : ''}
+              {topSignal} {articles.length} signal{articles.length !== 1 ? 's' : ''}
             </span>
           ) : (
             <span className="text-xs text-gray-400 italic">No material updates</span>
           )}
 
-          {/* Per-ticker refresh button */}
           {onRefresh && (
             <span
               role="button"
@@ -125,43 +132,49 @@ export default function TickerCard({ ticker, tickerSummary, articles, onRefresh 
       {/* Collapsible body */}
       {expanded && (
         <div className="px-5 pb-5 border-t border-gray-200">
-          {tickerSummary && (
-            <p className="text-sm text-gray-600 italic pt-3 pb-3 leading-snug">{tickerSummary}</p>
-          )}
-
           {hasNews ? (
-            <div className={`space-y-3 ${tickerSummary ? 'border-t border-gray-200 pt-3' : 'pt-3'}`}>
-              {articles.map((article, i) => (
-                <div key={i} className="border-t border-gray-100 pt-3 first:border-t-0 first:pt-0">
-                  <div className="flex items-start gap-2 mb-1">
-                    <span className="text-base mt-0.5 flex-shrink-0">{article.signal}</span>
-                    <div className="min-w-0">
-                      <a
-                        href={article.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-medium text-blue-700 hover:underline leading-snug"
-                      >
-                        {article.title}
-                      </a>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-700 leading-relaxed ml-6">{article.summary}</p>
-                  <div className="ml-6 mt-1.5 flex flex-wrap items-center gap-2">
-                    {article.dipVerdict && DIP_VERDICT_STYLE[article.dipVerdict] && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${DIP_VERDICT_STYLE[article.dipVerdict].classes}`}>
-                        {DIP_VERDICT_STYLE[article.dipVerdict].label}
-                      </span>
-                    )}
-                    {article.isAnalystRec && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium">
-                        Analyst Rec — verify independently
-                      </span>
-                    )}
-                    <span className="text-xs text-gray-400">{formatIST(article.publishedAt)}</span>
-                  </div>
+            <div className="pt-3 space-y-3">
+              {/* Narrative briefing */}
+              <p className="text-sm text-gray-800 leading-relaxed">{tickerSummary}</p>
+
+              {/* Dip verdict */}
+              {topDipVerdict && DIP_VERDICT_STYLE[topDipVerdict] && (
+                <div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${DIP_VERDICT_STYLE[topDipVerdict].classes}`}>
+                    {DIP_VERDICT_STYLE[topDipVerdict].label}
+                  </span>
                 </div>
-              ))}
+              )}
+
+              {/* Sources */}
+              <div className="border-t border-gray-100 pt-3">
+                <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-2">Sources</p>
+                <div className="space-y-1.5">
+                  {articles.map((article, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <span className="text-sm flex-shrink-0 mt-0.5">{article.signal}</span>
+                      <div className="min-w-0 flex-1">
+                        <a
+                          href={article.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline leading-snug block truncate"
+                        >
+                          {article.title}
+                        </a>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-gray-400">{formatIST(article.publishedAt)}</span>
+                          {article.isAnalystRec && (
+                            <span className="text-xs px-1 py-0 rounded bg-purple-100 text-purple-700 font-medium">
+                              Analyst rec
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : (
             <p className="text-sm text-gray-400 italic pt-3">No material updates in this period.</p>

@@ -158,15 +158,19 @@ export async function POST(req: NextRequest) {
   if (newSignalFound) {
     const { data: relevantForTicker } = await serviceClient
       .from('analyzed_articles')
-      .select('signal, summary')
+      .select('signal, summary, article_title')
       .eq('ticker', ticker)
       .gte('published_at', coverageStart.toISOString())
       .not('signal', 'is', null)
       .not('summary', 'is', null)
       .order('published_at', { ascending: false })
 
-    const summaries = (relevantForTicker || []).map((r) => `${r.signal} ${r.summary}`)
-    const synthesis = await synthesizeTicker(ticker, stock.name, summaries)
+    const articlesForSynthesis = (relevantForTicker || []).map((r) => ({
+      signal: r.signal as string,
+      summary: r.summary as string,
+      title: r.article_title as string,
+    }))
+    const synthesis = await synthesizeTicker(ticker, stock.name, articlesForSynthesis)
 
     await serviceClient
       .from('ticker_synthesis')
