@@ -29,6 +29,20 @@ function getTopDipVerdict(articles: Article[]): string | null {
   return null
 }
 
+const SIGNAL_SORT_ORDER: Record<string, number> = { '❌': 0, '⚠️': 1, '✅': 2 }
+function getTopSources(articles: Article[], limit = 5): Article[] {
+  return [...articles]
+    .sort((a, b) => (SIGNAL_SORT_ORDER[a.signal] ?? 3) - (SIGNAL_SORT_ORDER[b.signal] ?? 3))
+    .slice(0, limit)
+}
+
+function parseBullets(text: string): string[] {
+  return text
+    .split('\n')
+    .map((l) => l.replace(/^[-•*]\s*/, '').trim())
+    .filter(Boolean)
+}
+
 interface TickerCardProps {
   ticker: string
   tickerSummary: string
@@ -135,8 +149,15 @@ export default function TickerCard({ ticker, tickerSummary, articles, onRefresh 
         <div className="px-5 pb-5 border-t border-gray-200">
           {hasNews ? (
             <div className="pt-3 space-y-3">
-              {/* Narrative briefing */}
-              <p className="text-sm text-gray-800 leading-relaxed">{tickerSummary}</p>
+              {/* Bullet summary */}
+              <ul className="space-y-1.5 text-sm text-gray-800 leading-relaxed">
+                {parseBullets(tickerSummary).map((bullet, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span className="text-gray-400 flex-shrink-0 mt-0.5">•</span>
+                    <span>{bullet}</span>
+                  </li>
+                ))}
+              </ul>
 
               {/* Dip verdict */}
               {topDipVerdict && DIP_VERDICT_STYLE[topDipVerdict] && (
@@ -159,30 +180,27 @@ export default function TickerCard({ ticker, tickerSummary, articles, onRefresh 
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                   </svg>
-                  {articles.length} source{articles.length !== 1 ? 's' : ''}
+                  {Math.min(articles.length, 5)} source{Math.min(articles.length, 5) !== 1 ? 's' : ''}
                 </button>
                 {sourcesExpanded && (
                   <div className="mt-2 space-y-1.5">
-                    {articles.map((article, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <span className="text-sm flex-shrink-0 mt-0.5">{article.signal}</span>
-                        <div className="min-w-0 flex-1">
-                          <a
-                            href={article.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-blue-600 hover:underline leading-snug block truncate"
-                          >
-                            {article.title}
-                          </a>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-gray-400">{formatIST(article.publishedAt)}</span>
-                            {article.isAnalystRec && (
-                              <span className="text-xs px-1 py-0 rounded bg-purple-100 text-purple-700 font-medium">
-                                Analyst rec
-                              </span>
-                            )}
-                          </div>
+                    {getTopSources(articles).map((article, i) => (
+                      <div key={i} className="min-w-0">
+                        <a
+                          href={article.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline leading-snug block truncate"
+                        >
+                          {article.title}
+                        </a>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-gray-400">{formatIST(article.publishedAt)}</span>
+                          {article.isAnalystRec && (
+                            <span className="text-xs px-1 py-0 rounded bg-purple-100 text-purple-700 font-medium">
+                              Analyst rec
+                            </span>
+                          )}
                         </div>
                       </div>
                     ))}

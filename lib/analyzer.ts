@@ -72,7 +72,7 @@ function synthesisPrompt(ticker: string, tickerName: string, findings: string): 
 Relevant developments:
 ${findings}
 
-Write plain prose. Lead with the most important signal. Group related events into one point (e.g. multiple reports of the same crash = one sentence). Include key numbers (₹ crore, %). No bullet points, no headers, no source references. Direct and specific. Use as many sentences as needed — 2 if the news is thin, up to 8 if there are multiple distinct material developments. Do not pad if nothing new to add.`
+Write as bullet points, one per distinct development. Lead with the most important signal. Group related events into one bullet (e.g. multiple reports of the same crash = one bullet). Include key numbers (₹ crore, %). No headers, no source references. Use 2 bullets if the news is thin, up to 6 if there are many distinct developments. Do not pad. Format each line as: - <text>`
 }
 
 function parseAnalysis(text: string): AnalysisResult {
