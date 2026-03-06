@@ -72,7 +72,12 @@ function synthesisPrompt(ticker: string, tickerName: string, findings: string): 
 Relevant developments:
 ${findings}
 
-Write as bullet points, one per distinct development. Lead with the most important signal. Group related events into one bullet (e.g. multiple reports of the same crash = one bullet). Include key numbers (₹ crore, %). No headers, no source references. Use 2 bullets if the news is thin, up to 6 if there are many distinct developments. Do not pad. Format each line as: - <text>`
+Write as bullet points, one per distinct development. Each bullet must be on its own line. Lead with the most important signal. Group related events into one bullet (e.g. multiple reports of the same crash = one bullet). Include key numbers (₹ crore, %). No headers, no source references. Use 2 bullets if the news is thin, up to 6 if there are many distinct developments. Do not pad.
+
+Output format (one bullet per line, no blank lines between):
+- first development
+- second development
+- third development`
 }
 
 function parseAnalysis(text: string): AnalysisResult {

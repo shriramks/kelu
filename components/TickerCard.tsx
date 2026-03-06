@@ -37,10 +37,13 @@ function getTopSources(articles: Article[], limit = 5): Article[] {
 }
 
 function parseBullets(text: string): string[] {
-  return text
-    .split('\n')
-    .map((l) => l.replace(/^[-•*]\s*/, '').trim())
-    .filter(Boolean)
+  // Try newline-separated first
+  const lines = text.split('\n').map((l) => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean)
+  if (lines.length > 1) return lines
+  // Fallback: inline bullets separated by " - "
+  const inline = text.split(/\s+-\s+/).map((l) => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean)
+  if (inline.length > 1) return inline
+  return lines
 }
 
 interface TickerCardProps {
