@@ -72,7 +72,7 @@ function parseAnalysis(text: string): AnalysisResult {
   const parsed = JSON.parse(normalized)
   return {
     relevant: Boolean(parsed.relevant),
-    signal: parsed.signal as Signal | null,
+    signal: (parsed.signal ?? null) as Signal | null,
     summary: parsed.summary || null,
     dipVerdict: (parsed.dip_verdict as DipVerdict) || null,
     isAnalystRec: Boolean(parsed.is_analyst_rec),
@@ -171,15 +171,14 @@ export async function analyzeArticle(
   context: string,
   title: string,
   snippet: string,
-  seenEvents: string[] = []
 ): Promise<AnalysisResult> {
   for (const provider of PROVIDERS) {
     if (!isAvailable(provider)) continue
     try {
       let result: AnalysisResult
-      if (provider === 'groq') result = await analyzeWithGroq(ticker, tickerName, context, title, snippet, seenEvents)
-      else if (provider === 'gemini') result = await analyzeWithGemini(ticker, tickerName, context, title, snippet, seenEvents)
-      else result = await analyzeWithClaude(ticker, tickerName, context, title, snippet, seenEvents)
+      if (provider === 'groq') result = await analyzeWithGroq(ticker, tickerName, context, title, snippet, [])
+      else if (provider === 'gemini') result = await analyzeWithGemini(ticker, tickerName, context, title, snippet, [])
+      else result = await analyzeWithClaude(ticker, tickerName, context, title, snippet, [])
 
       console.log(`  [${provider}] tokens in=${result.inputTokens} out=${result.outputTokens} relevant=${result.relevant} signal=${result.signal}`)
       return result

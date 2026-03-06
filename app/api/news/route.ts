@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import pLimit from 'p-limit'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase-server'
 import { STOCKS } from '@/lib/stocks'
 import { fetchRssFeed, fetchMetaDescription } from '@/lib/rss'
@@ -83,33 +84,23 @@ export async function POST(req: NextRequest) {
 
   console.log(`[${ticker}] RSS: ${articles.length} articles in window`)
 
-  // Sort: articles mentioning the company name in the title come first,
-  // so the 5-article cap doesn't waste slots on generic market roundups.
-  const namePrefix = stock.name.toLowerCase().split(' ').slice(0, 2).join(' ')
-  const tickerLower = ticker.toLowerCase()
-  const sortedArticles = [...articles].sort((a, b) => {
-    const aTitle = a.title.toLowerCase()
-    const bTitle = b.title.toLowerCase()
-    const aScore = (aTitle.includes(namePrefix) || aTitle.includes(tickerLower)) ? 1 : 0
-    const bScore = (bTitle.includes(namePrefix) || bTitle.includes(tickerLower)) ? 1 : 0
-    return bScore - aScore
-  })
-
-  const newArticles = sortedArticles.filter((a) => !seenUrls.has(a.link)).slice(0, 5)
+  const newArticles = articles.filter((a) => !seenUrls.has(a.link)).slice(0, 20)
   console.log(`[${ticker}] ${newArticles.length} to analyze (${seenUrls.size} already have a signal)`)
 
-  // Fetch meta descriptions in parallel for all articles before analysis
+  // Fetch meta descriptions in parallel for all articles
   const metaDescs = await Promise.all(
     newArticles.map((a) => fetchMetaDescription(a.realUrl))
   )
 
-  const seenTitles: string[] = []
-  const seenEvents: string[] = []
-  let newSignalFound = false
+  const enrichedArticles = newArticles.map((a, i) => ({
+    ...a,
+    snippet: metaDescs[i] || a.snippet,
+    snippetSource: metaDescs[i] ? `meta(${metaDescs[i]!.length}c)` : `rss(${a.snippet.length}c)`,
+  }))
 
-  for (let idx = 0; idx < newArticles.length; idx++) {
-    const article = { ...newArticles[idx], snippet: metaDescs[idx] || newArticles[idx].snippet }
-    console.log(`[${ticker}] snippet source: ${metaDescs[idx] ? `meta(${metaDescs[idx]!.length}c)` : `rss(${newArticles[idx].snippet.length}c)`}`)
+  // Deduplicate by title similarity within this batch
+  const seenTitles: string[] = []
+  const toAnalyze = enrichedArticles.filter((article) => {
     const titleWords = new Set(article.title.toLowerCase().split(/\W+/).filter((w) => w.length > 3))
     const isDuplicate = seenTitles.some((seen) => {
       const seenWords = new Set(seen.toLowerCase().split(/\W+/).filter((w) => w.length > 3))
@@ -118,32 +109,50 @@ export async function POST(req: NextRequest) {
       return union > 0 && intersection / union > 0.5
     })
     if (isDuplicate) {
-      console.log(`[${ticker}] skipped duplicate title: "${article.title.slice(0, 60)}"`)
-      continue
+      console.log(`[${ticker}] skipped duplicate: "${article.title.slice(0, 60)}"`)
+      return false
     }
     seenTitles.push(article.title)
+    return true
+  })
 
-    const analysis = await analyzeArticle(ticker, stock.name, stock.context, article.title, article.snippet, seenEvents)
-    console.log(`[${ticker}] "${article.title.slice(0, 60)}" → relevant=${analysis.relevant} signal=${analysis.signal}`)
+  // Analyze in parallel — 3 concurrent Gemini calls max
+  const limit = pLimit(3)
+  let newSignalFound = false
 
-    if (analysis.relevant && analysis.summary) seenEvents.push(article.title)
-    if (analysis.signal !== null) newSignalFound = true
-
-    const { error: upsertErr } = await serviceClient.from('analyzed_articles').upsert(
-      {
-        ticker,
-        article_url: article.link,
-        article_title: article.title,
-        published_at: article.pubDate.toISOString(),
-        summary: analysis.summary,
-        signal: analysis.signal,
-        dip_verdict: analysis.dipVerdict,
-        is_analyst_rec: analysis.isAnalystRec,
-      },
-      { onConflict: 'ticker,article_url' }
+  const results = await Promise.all(
+    toAnalyze.map((article) =>
+      limit(async () => {
+        console.log(`[${ticker}] snippet source: ${article.snippetSource}`)
+        const analysis = await analyzeArticle(ticker, stock.name, stock.context, article.title, article.snippet)
+        const signal = analysis.signal ?? null  // guard against undefined
+        console.log(`[${ticker}] "${article.title.slice(0, 60)}" → relevant=${analysis.relevant} signal=${signal}`)
+        if (signal !== null) newSignalFound = true
+        return { article, analysis: { ...analysis, signal } }
+      })
     )
-    if (upsertErr) console.error(`[${ticker}] Upsert error:`, upsertErr.message)
-  }
+  )
+
+  // Upsert all results to DB
+  await Promise.all(
+    results.map(({ article, analysis }) =>
+      serviceClient.from('analyzed_articles').upsert(
+        {
+          ticker,
+          article_url: article.link,
+          article_title: article.title,
+          published_at: article.pubDate.toISOString(),
+          summary: analysis.summary,
+          signal: analysis.signal,
+          dip_verdict: analysis.dipVerdict,
+          is_analyst_rec: analysis.isAnalystRec,
+        },
+        { onConflict: 'ticker,article_url' }
+      ).then(({ error }) => {
+        if (error) console.error(`[${ticker}] Upsert error:`, error.message)
+      })
+    )
+  )
 
   // Synthesize only if new signals were found this run
   if (newSignalFound) {
@@ -171,7 +180,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ done: true })
 }
 
-// GET — pure DB read: rolling 24h window, no Groq calls
+// GET — pure DB read: rolling 24h window, no AI calls
 export async function GET(req: NextRequest) {
   const supabase = createSupabaseServerClient()
   const {
