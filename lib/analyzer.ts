@@ -72,7 +72,7 @@ function synthesisPrompt(ticker: string, tickerName: string, findings: string): 
 Relevant developments:
 ${findings}
 
-Write 2-4 sentences of plain prose. Lead with the most important signal. Group related events into one point (e.g. multiple reports of the same crash = one sentence). Include key numbers (₹ crore, %). No bullet points, no headers, no source references. Direct and specific.`
+Write plain prose. Lead with the most important signal. Group related events into one point (e.g. multiple reports of the same crash = one sentence). Include key numbers (₹ crore, %). No bullet points, no headers, no source references. Direct and specific. Use as many sentences as needed — 2 if the news is thin, up to 8 if there are multiple distinct material developments. Do not pad if nothing new to add.`
 }
 
 function parseAnalysis(text: string): AnalysisResult {
@@ -140,7 +140,7 @@ async function synthesizeWithGroq(prompt: string): Promise<string> {
   const client = new Groq({ apiKey: process.env.GROQ_API_KEY })
   const response = await client.chat.completions.create({
     model: 'llama-3.1-8b-instant',
-    max_tokens: 80,
+    max_tokens: 400,
     messages: [{ role: 'user', content: prompt }],
   })
   return response.choices[0]?.message?.content?.trim() ?? ''
@@ -157,7 +157,7 @@ async function synthesizeWithClaude(prompt: string): Promise<string> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 80,
+    max_tokens: 400,
     messages: [{ role: 'user', content: prompt }],
   })
   const content = response.content[0]

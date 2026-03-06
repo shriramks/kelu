@@ -57,6 +57,7 @@ function getTopSignal(articles: Article[]): Signal | null {
 
 export default function TickerCard({ ticker, tickerSummary, articles, onRefresh }: TickerCardProps) {
   const [expanded, setExpanded] = useState(true)
+  const [sourcesExpanded, setSourcesExpanded] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const stock = STOCKS.find((s) => s.ticker === ticker)
   const topSignal = getTopSignal(articles)
@@ -146,34 +147,47 @@ export default function TickerCard({ ticker, tickerSummary, articles, onRefresh 
                 </div>
               )}
 
-              {/* Sources */}
+              {/* Sources toggle */}
               <div className="border-t border-gray-100 pt-3">
-                <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-2">Sources</p>
-                <div className="space-y-1.5">
-                  {articles.map((article, i) => (
-                    <div key={i} className="flex items-start gap-2">
-                      <span className="text-sm flex-shrink-0 mt-0.5">{article.signal}</span>
-                      <div className="min-w-0 flex-1">
-                        <a
-                          href={article.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:underline leading-snug block truncate"
-                        >
-                          {article.title}
-                        </a>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-gray-400">{formatIST(article.publishedAt)}</span>
-                          {article.isAnalystRec && (
-                            <span className="text-xs px-1 py-0 rounded bg-purple-100 text-purple-700 font-medium">
-                              Analyst rec
-                            </span>
-                          )}
+                <button
+                  onClick={() => setSourcesExpanded((v) => !v)}
+                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg
+                    className={`h-3 w-3 transition-transform duration-150 ${sourcesExpanded ? 'rotate-90' : ''}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                  {articles.length} source{articles.length !== 1 ? 's' : ''}
+                </button>
+                {sourcesExpanded && (
+                  <div className="mt-2 space-y-1.5">
+                    {articles.map((article, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="text-sm flex-shrink-0 mt-0.5">{article.signal}</span>
+                        <div className="min-w-0 flex-1">
+                          <a
+                            href={article.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline leading-snug block truncate"
+                          >
+                            {article.title}
+                          </a>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-gray-400">{formatIST(article.publishedAt)}</span>
+                            {article.isAnalystRec && (
+                              <span className="text-xs px-1 py-0 rounded bg-purple-100 text-purple-700 font-medium">
+                                Analyst rec
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ) : (
