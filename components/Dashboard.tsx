@@ -113,16 +113,22 @@ export default function Dashboard() {
   const refresh = useCallback(async () => {
     setRefreshing(true)
     setError(null)
+    const failed: string[] = []
     try {
       for (let i = 0; i < STOCKS.length; i++) {
         setRefreshStatus({ ticker: STOCKS[i].ticker, done: i, total: STOCKS.length })
-        const res = await postTicker(STOCKS[i].ticker)
-        if (res.status === 401) { router.push('/login'); return }
-        if (!res.ok) throw new Error(`Server error: ${res.status}`)
+        try {
+          const res = await postTicker(STOCKS[i].ticker)
+          if (res.status === 401) { router.push('/login'); return }
+          if (!res.ok) failed.push(STOCKS[i].ticker)
+        } catch {
+          failed.push(STOCKS[i].ticker)
+        }
       }
       setRefreshStatus(null)
       await recordRun()
       await reloadData()
+      if (failed.length > 0) setError(`Failed to refresh: ${failed.join(', ')}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to refresh news.')
     } finally {
