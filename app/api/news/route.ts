@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import pLimit from 'p-limit'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase-server'
-import { STOCKS } from '@/lib/stocks'
 import { fetchRssFeed, fetchMetaDescription } from '@/lib/rss'
 import { analyzeArticle, synthesizeTicker } from '@/lib/analyzer'
 
-// 24-hour rolling coverage window
+// 12-hour rolling coverage window
 function getCoverageWindow(): { start: Date; end: Date } {
   const now = new Date()
   return {
-    start: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+    start: new Date(now.getTime() - 12 * 60 * 60 * 1000),
     end: now,
   }
 }
@@ -57,8 +56,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ done: true })
   }
 
-  const stock = STOCKS.find((s) => s.ticker === ticker)
-  if (!stock) return NextResponse.json({ error: 'Unknown ticker' }, { status: 400 })
+  const { data: stock, error: stockErr } = await serviceClient
+    .from('stocks')
+    .select('name, rss_url, context')
+    .eq('ticker', ticker)
+    .single()
+
+  if (stockErr || !stock) return NextResponse.json({ error: 'Unknown ticker' }, { status: 400 })
 
   const { start: coverageStart, end: coverageEnd } = getCoverageWindow()
 
@@ -71,7 +75,7 @@ export async function POST(req: NextRequest) {
       .select('article_url, signal')
       .eq('ticker', ticker)
       .gte('published_at', coverageStart.toISOString()),
-    fetchRssFeed(stock.rssUrl, coverageStart, coverageEnd),
+    fetchRssFeed(stock.rss_url, coverageStart, coverageEnd),
   ])
 
   if (dedupErr) console.error(`[${ticker}] Dedup error:`, dedupErr.message)
@@ -124,7 +128,7 @@ export async function POST(req: NextRequest) {
     toAnalyze.map((article) =>
       limit(async () => {
         console.log(`[${ticker}] snippet source: ${article.snippetSource}`)
-        const analysis = await analyzeArticle(ticker, stock.name, stock.context, article.title, article.snippet)
+        const analysis = await analyzeArticle(ticker, stock.name, stock.context as string, article.title, article.snippet)
         const signal = analysis.signal ?? null  // guard against undefined
         console.log(`[${ticker}] "${article.title.slice(0, 60)}" → relevant=${analysis.relevant} signal=${signal}`)
         if (signal !== null) newSignalFound = true
@@ -199,7 +203,7 @@ export async function GET(req: NextRequest) {
   const serviceClient = createSupabaseServiceClient()
   const { start: coverageStart, end: coverageEnd } = getCoverageWindow()
 
-  const [{ data: synthRows }, { data: allRelevant }, { data: lastRun }] = await Promise.all([
+  const [{ data: synthRows }, { data: allRelevant }, { data: lastRun }, { data: allStocks }] = await Promise.all([
     serviceClient.from('ticker_synthesis').select('ticker, summary'),
     serviceClient
       .from('analyzed_articles')
@@ -214,6 +218,7 @@ export async function GET(req: NextRequest) {
       .order('run_at', { ascending: false })
       .limit(1)
       .single(),
+    serviceClient.from('stocks').select('ticker').order('sort_order'),
   ])
 
   if (!lastRun && (!allRelevant || allRelevant.length === 0)) {
@@ -226,7 +231,7 @@ export async function GET(req: NextRequest) {
   }
 
   const byTicker: Record<string, TickerResult> = {}
-  for (const stock of STOCKS) {
+  for (const stock of allStocks || []) {
     byTicker[stock.ticker] = {
       ticker: stock.ticker,
       tickerSummary: tickerSummaries[stock.ticker] ?? 'No news in coverage window.',

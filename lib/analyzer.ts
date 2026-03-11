@@ -54,6 +54,8 @@ Content: ${snippet.slice(0, 800)}
 Reply with JSON only:
 {"relevant":bool,"signal":"✅"|"⚠️"|"❌"|null,"summary":"2 sentences: key fact with number/%, then why it matters"|null,"dip_verdict":"accumulate"|"hold"|"avoid"|"monitor"|null,"is_analyst_rec":bool}
 
+If the content snippet is short or generic, rely on the title — a specific title naming an order win, result, regulatory action, or analyst call is enough to mark relevant=true.
+
 ✅ = positive: order win, earnings beat, specific upgrade, regulatory tailwind
 ⚠️ = mixed/watch: soft results, downgrade, unresolved risk, governance concern
 ❌ = serious adverse: fraud, ban, >30% earnings collapse, thesis-breaking event
