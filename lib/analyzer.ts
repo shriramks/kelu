@@ -36,7 +36,9 @@ You do NOT care about:
 - Price movements, technical levels, 52-week highs/lows
 - "Stocks to watch" roundups where this is one of 5+ tickers
 - Broad Sensex/Nifty market commentary
-- Recycled PR or IR fluff without new data`
+- Recycled PR or IR fluff without new data
+
+EXCEPTION — "Why is X falling/rising" articles: if the article explicitly names a specific business reason for the move (earnings miss, order cancellation, guidance cut, regulatory action, management statement), mark it relevant and surface that business reason as the signal. Ignore the price-movement framing; extract the underlying cause. A 5%+ single-day move almost always has a fundamental driver worth flagging.`
 
 // ─── Shared prompt builders ───────────────────────────────────────────────────
 
