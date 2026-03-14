@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { STOCKS, getSignalBg, getSignalBadge, type Signal } from '@/lib/stocks'
+import { getSignalBg, getSignalBadge, type Signal } from '@/lib/stocks'
 
 interface Article {
   title: string
@@ -48,6 +48,7 @@ function parseBullets(text: string): string[] {
 
 interface TickerCardProps {
   ticker: string
+  name?: string
   tickerSummary: string
   articles: Article[]
   onRefresh?: () => Promise<void>
@@ -72,11 +73,10 @@ function getTopSignal(articles: Article[]): Signal | null {
   return null
 }
 
-export default function TickerCard({ ticker, tickerSummary, articles, onRefresh }: TickerCardProps) {
+export default function TickerCard({ ticker, name, tickerSummary, articles, onRefresh }: TickerCardProps) {
   const [expanded, setExpanded] = useState(true)
   const [sourcesExpanded, setSourcesExpanded] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const stock = STOCKS.find((s) => s.ticker === ticker)
   const topSignal = getTopSignal(articles)
   const hasNews = articles.length > 0
   const cardBg = hasNews ? getSignalBg(topSignal) : 'bg-white border-gray-200'
@@ -109,7 +109,7 @@ export default function TickerCard({ ticker, tickerSummary, articles, onRefresh 
           </svg>
           <div className="min-w-0">
             <span className="font-bold text-gray-900 text-sm">{ticker}</span>
-            {stock && <span className="ml-2 text-xs text-gray-500">{stock.name}</span>}
+            {name && <span className="ml-2 text-xs text-gray-500">{name}</span>}
             {!expanded && tickerSummary && hasNews && (
               <p className="text-xs text-gray-500 mt-0.5 truncate max-w-md">{tickerSummary}</p>
             )}

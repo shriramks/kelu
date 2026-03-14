@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser'
 import TickerCard from './TickerCard'
-import { STOCKS } from '@/lib/stocks'
 
 interface Article {
   title: string
@@ -18,6 +17,7 @@ interface Article {
 
 interface TickerData {
   ticker: string
+  name: string
   tickerSummary: string
   articles: Article[]
 }
@@ -114,15 +114,16 @@ export default function Dashboard() {
     setRefreshing(true)
     setError(null)
     const failed: string[] = []
+    const tickersToRefresh = data?.tickers ?? []
     try {
-      for (let i = 0; i < STOCKS.length; i++) {
-        setRefreshStatus({ ticker: STOCKS[i].ticker, done: i, total: STOCKS.length })
+      for (let i = 0; i < tickersToRefresh.length; i++) {
+        setRefreshStatus({ ticker: tickersToRefresh[i].ticker, done: i, total: tickersToRefresh.length })
         try {
-          const res = await postTicker(STOCKS[i].ticker)
+          const res = await postTicker(tickersToRefresh[i].ticker)
           if (res.status === 401) { router.push('/login'); return }
-          if (!res.ok) failed.push(STOCKS[i].ticker)
+          if (!res.ok) failed.push(tickersToRefresh[i].ticker)
         } catch {
-          failed.push(STOCKS[i].ticker)
+          failed.push(tickersToRefresh[i].ticker)
         }
       }
       setRefreshStatus(null)
@@ -135,7 +136,7 @@ export default function Dashboard() {
       setRefreshing(false)
       setRefreshStatus(null)
     }
-  }, [router, reloadData])
+  }, [router, reloadData, data])
 
   useEffect(() => {
     loadCached()
@@ -159,7 +160,7 @@ export default function Dashboard() {
         }
         return signalOrder(a) - signalOrder(b)
       })
-    : STOCKS.map((s) => ({ ticker: s.ticker, tickerSummary: '', articles: [] }))
+    : []
 
   const withNewsCount = data?.tickers?.filter((t) => t.articles.length > 0).length ?? 0
   const progressPct = refreshStatus ? Math.round((refreshStatus.done / refreshStatus.total) * 100) : 0
@@ -263,9 +264,9 @@ export default function Dashboard() {
         {/* Loading skeleton */}
         {loading && (
           <div className="flex flex-col gap-3">
-            {STOCKS.map((s) => (
+            {Array.from({ length: 6 }).map((_, i) => (
               <div
-                key={s.ticker}
+                key={i}
                 className="rounded-xl border border-gray-200 bg-white px-5 py-4 animate-pulse flex items-center gap-3"
               >
                 <div className="h-4 w-4 bg-gray-200 rounded" />
@@ -298,6 +299,7 @@ export default function Dashboard() {
               <TickerCard
                 key={t.ticker}
                 ticker={t.ticker}
+                name={t.name}
                 tickerSummary={t.tickerSummary}
                 articles={t.articles}
                 onRefresh={refreshing || !!refreshStatus ? undefined : () => refreshSingleTicker(t.ticker)}

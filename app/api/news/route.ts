@@ -25,6 +25,7 @@ type ArticleRow = {
 
 type TickerResult = {
   ticker: string
+  name: string
   tickerSummary: string
   articles: ArticleRow[]
 }
@@ -218,11 +219,14 @@ export async function GET(req: NextRequest) {
       .order('run_at', { ascending: false })
       .limit(1)
       .single(),
-    serviceClient.from('stocks').select('ticker').order('sort_order'),
+    serviceClient.from('stocks').select('ticker, name').order('sort_order'),
   ])
 
   if (!lastRun && (!allRelevant || allRelevant.length === 0)) {
-    return NextResponse.json({ noData: true })
+    return NextResponse.json({
+      noData: true,
+      tickers: (allStocks || []).map((s) => ({ ticker: s.ticker, name: s.name, tickerSummary: 'No news yet.', articles: [] })),
+    })
   }
 
   const tickerSummaries: Record<string, string> = {}
@@ -234,6 +238,7 @@ export async function GET(req: NextRequest) {
   for (const stock of allStocks || []) {
     byTicker[stock.ticker] = {
       ticker: stock.ticker,
+      name: stock.name,
       tickerSummary: tickerSummaries[stock.ticker] ?? 'No news in coverage window.',
       articles: [],
     }

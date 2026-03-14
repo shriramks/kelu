@@ -1,40 +1,63 @@
-export type Signal = '✅' | '⚠️' | '❌'
+# Kelu
 
-export function getSignalLabel(signal: Signal | null): string {
-  switch (signal) {
-    case '✅':
-      return 'Positive'
-    case '⚠️':
-      return 'Neutral / Watch'
-    case '❌':
-      return 'Red Flag'
-    default:
-      return 'No Signal'
-  }
-}
+Kelu filters the noise out of financial news for your stock picks — pulling from Google Alerts, running each article through Gemini AI, and surfacing only what actually matters for a long-term investor.
 
-export function getSignalBg(signal: Signal | null): string {
-  switch (signal) {
-    case '✅':
-      return 'bg-green-50 border-green-200'
-    case '⚠️':
-      return 'bg-yellow-50 border-yellow-200'
-    case '❌':
-      return 'bg-red-50 border-red-200'
-    default:
-      return 'bg-gray-50 border-gray-200'
-  }
-}
+---
 
-export function getSignalBadge(signal: Signal | null): string {
-  switch (signal) {
-    case '✅':
-      return 'bg-green-100 text-green-800'
-    case '⚠️':
-      return 'bg-yellow-100 text-yellow-800'
-    case '❌':
-      return 'bg-red-100 text-red-800'
-    default:
-      return 'bg-gray-100 text-gray-600'
-  }
-}
+## Contents
+
+- [The Problem](#the-problem)
+- [The Solution](#the-solution)
+- [AI Features](#ai-features)
+- [Docs](#docs)
+
+---
+
+## The Problem
+
+Following a focused set of stocks across Indian financial media means wading through:
+- "Stocks to watch" roundups where your holding is one of 50
+- Price movement articles with no fundamental content
+- Recycled analyst targets with no new reasoning
+- Generic sector commentary that never names your company
+
+The signal-to-noise ratio is terrible. A tax demand slashed by 90%, a major order win, a regulatory ruling — these get buried under the same volume of noise as a stock-price tick.
+
+---
+
+## The Solution
+
+Kelu connects a Google Alerts RSS feed to each stock in your watchlist. Every refresh:
+
+1. Fetches new articles from each feed
+2. Fetches the full meta description from each article URL for richer context
+3. Runs each article through Gemini AI — is this actually material for a long-term investor?
+4. Stores results and surfaces only what passes the filter, with a signal flag and a plain-English summary
+
+No brokerage integration. No auto-sync. Intentionally manual.
+
+---
+
+## AI Features
+
+Analysis uses **Gemini 2.5 Flash** (Groq llama-3.1-8b as fallback):
+
+- **Per-article signal**: ✅ positive catalyst, ⚠️ watch, ❌ thesis-breaking event
+- **Dip verdict**: `accumulate / hold / monitor / avoid` — should you add if the stock pulls back?
+- **Synthesis**: after each refresh, a bullet-point briefing per ticker summarising all signals found
+
+Stocks and their investment context (what to include, what to ignore) are configured in Supabase — no hardcoded watchlist in the code.
+
+---
+
+## Docs
+
+| Document | Description |
+|----------|-------------|
+| [docs/architecture.md](docs/architecture.md) | Data flow, filters, edge cases, DB schema |
+
+---
+
+## Built with
+
+Vibe-coded with [Claude Code](https://claude.ai/code). Stack: Next.js 14, TypeScript, Tailwind CSS, Supabase, Gemini 2.5 Flash.
