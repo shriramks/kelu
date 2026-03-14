@@ -4,11 +4,11 @@ import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/s
 import { fetchRssFeed, fetchMetaDescription } from '@/lib/rss'
 import { analyzeArticle, synthesizeTicker } from '@/lib/analyzer'
 
-// 12-hour rolling coverage window
+// 48-hour rolling coverage window
 function getCoverageWindow(): { start: Date; end: Date } {
   const now = new Date()
   return {
-    start: new Date(now.getTime() - 12 * 60 * 60 * 1000),
+    start: new Date(now.getTime() - 48 * 60 * 60 * 1000),
     end: now,
   }
 }
