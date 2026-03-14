@@ -170,7 +170,7 @@ export default function Dashboard() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-lg font-bold text-gray-900 tracking-tight">Stock News</h1>
+            <h1 className="text-lg font-bold text-gray-900 tracking-tight">Kelu</h1>
             <span className="text-xs text-gray-400 hidden sm:block">Financial News Dashboard</span>
           </div>
           <div className="flex items-center gap-3">
