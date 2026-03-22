@@ -169,21 +169,14 @@ export default function Dashboard() {
       {/* Nav bar */}
       <header className="sticky top-0 z-10" style={{ background: 'var(--bg-nav)', borderBottom: '1px solid var(--border)' }}>
         <div className="max-w-2xl mx-auto px-4 flex items-center justify-between h-11">
-          <h1 className="text-headline" style={{ color: 'var(--text-primary)' }}>Kelu</h1>
+          <h1 className="text-title-1" style={{ color: 'var(--text-primary)' }}>Kelu</h1>
           <div className="flex items-center gap-4">
-            {refreshStatus && (
-              <span className="text-subheadline" style={{ color: 'var(--text-muted)' }}>
-                {refreshStatus.total === 1
-                  ? `Refreshing ${refreshStatus.ticker}…`
-                  : `${refreshStatus.ticker} (${refreshStatus.done}/${refreshStatus.total})`}
-              </span>
-            )}
             <button
               onClick={refresh}
               disabled={refreshing || !!refreshStatus || loading}
               className="text-headline text-accent disabled:opacity-40 min-h-tap flex items-center"
             >
-              {refreshing || !!refreshStatus ? 'Refreshing…' : 'Refresh'}
+              Refresh
             </button>
             <button
               onClick={handleSignOut}
@@ -194,12 +187,25 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
+        {/* Refresh status bar — below nav, only visible during refresh */}
+        {refreshStatus && (
+          <div className="max-w-2xl mx-auto px-4 py-1.5 flex items-center gap-2" style={{ borderTop: '1px solid var(--border)' }}>
+            <svg className="h-3 w-3 animate-spin text-accent flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span className="text-subheadline" style={{ color: 'var(--text-muted)' }}>
+              {refreshStatus.total === 1
+                ? `Refreshing ${refreshStatus.ticker}…`
+                : `Refreshing ${refreshStatus.ticker} (${refreshStatus.done + 1}/${refreshStatus.total})`}
+            </span>
+          </div>
+        )}
       </header>
 
       <main className="max-w-2xl mx-auto">
         {/* Coverage dates */}
         {!loading && data && !data.noData && (
-          <p className="text-subheadline tabnum px-4 pt-3 pb-1" style={{ color: 'var(--text-faint)' }}>
+          <p className="text-subheadline tabnum px-4 pt-3 pb-1" style={{ color: 'var(--text-2)' }}>
             {formatIST(data.coverageStart)} — {formatIST(data.coverageEnd)}
           </p>
         )}
