@@ -77,7 +77,7 @@ const SIGNAL_COLOR: Record<string, string> = {
 }
 
 export default function TickerCard({ ticker, name, tickerSummary, articles, onRefresh }: TickerCardProps) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
   const [sourcesExpanded, setSourcesExpanded] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const topSignal = getTopSignal(articles)
@@ -100,19 +100,20 @@ export default function TickerCard({ ticker, name, tickerSummary, articles, onRe
       {/* Row */}
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center gap-3 py-3 text-left"
+        className="w-full flex items-center gap-3 py-3.5 text-left min-w-0"
       >
-        <span className="font-mono text-sm font-semibold text-gray-900 w-14 flex-shrink-0">{ticker}</span>
+        <span className="font-mono text-sm font-semibold text-gray-900 flex-shrink-0 min-w-[5rem]">{ticker}</span>
 
-        {hasNews && topSignal ? (
-          <span className={`text-sm ${SIGNAL_COLOR[topSignal]}`}>
-            {topSignal} {articles.length} signal{articles.length !== 1 ? 's' : ''}
-          </span>
-        ) : (
-          <span className="text-xs text-gray-400 italic">No updates</span>
-        )}
-
-        {name && <span className="text-xs text-gray-400 hidden sm:block">{name}</span>}
+        <span className="flex items-center gap-1.5 min-w-0">
+          {hasNews && topSignal ? (
+            <span className={`text-sm whitespace-nowrap ${SIGNAL_COLOR[topSignal]}`}>
+              {topSignal} {articles.length} signal{articles.length !== 1 ? 's' : ''}
+            </span>
+          ) : (
+            <span className="text-sm text-gray-400 italic">No updates</span>
+          )}
+          {name && <span className="text-xs text-gray-400 truncate hidden sm:block">{name}</span>}
+        </span>
 
         <div className="ml-auto flex items-center gap-2">
           {onRefresh && (
@@ -143,7 +144,7 @@ export default function TickerCard({ ticker, name, tickerSummary, articles, onRe
 
       {/* Expanded body */}
       {expanded && (
-        <div className="pb-3 pl-14">
+        <div className="pb-4 pl-[5rem]">
           {hasNews ? (
             <div className="space-y-2">
               <ul className="space-y-1 text-sm text-gray-700 leading-relaxed">

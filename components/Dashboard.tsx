@@ -169,10 +169,10 @@ export default function Dashboard() {
       {/* Top bar */}
       <header className="border-b border-gray-200 sticky top-0 z-10 bg-white">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-0.5">
             <h1 className="text-sm font-semibold text-gray-900 tracking-tight">Kelu</h1>
             {!loading && data && !data.noData && (
-              <span className="text-xs text-gray-400">
+              <span className="text-[11px] text-gray-400 tabular-nums">
                 {formatIST(data.coverageStart)} — {formatIST(data.coverageEnd)}
               </span>
             )}
