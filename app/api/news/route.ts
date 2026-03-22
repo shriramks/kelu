@@ -106,9 +106,9 @@ export async function POST(req: NextRequest) {
   // Deduplicate by title similarity within this batch
   const seenTitles: string[] = []
   const toAnalyze = enrichedArticles.filter((article) => {
-    const titleWords = new Set(article.title.toLowerCase().split(/\W+/).filter((w) => w.length > 3))
+    const titleWords = new Set(article.title.toLowerCase().split(/\W+/).filter((w: string) => w.length > 3))
     const isDuplicate = seenTitles.some((seen) => {
-      const seenWords = new Set(seen.toLowerCase().split(/\W+/).filter((w) => w.length > 3))
+      const seenWords = new Set(seen.toLowerCase().split(/\W+/).filter((w: string) => w.length > 3))
       const intersection = Array.from(titleWords).filter((w) => seenWords.has(w)).length
       const union = new Set([...Array.from(titleWords), ...Array.from(seenWords)]).size
       return union > 0 && intersection / union > 0.5
