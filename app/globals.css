@@ -2,9 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* ── Theme tokens ─────────────────────────────────────────────────────────── */
+:root {
+  --bg-primary:   #F2F2F7;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary:  #E5E5EA;
+  --bg-nav:       rgba(242,242,247,0.90);
+  --text-primary: #000000;
+  --text-2:       rgba(0,0,0,0.60);
+  --text-muted:   rgba(0,0,0,0.40);
+  --text-faint:   rgba(0,0,0,0.25);
+  --border:       rgba(0,0,0,0.10);
+  --border-faint: rgba(0,0,0,0.06);
+  --tap-active:   rgba(0,0,0,0.04);
+  --divider:      rgba(0,0,0,0.08);
+  --safe-bottom:  env(safe-area-inset-bottom, 0px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary:   #000000;
+    --bg-secondary: #1C1C1E;
+    --bg-tertiary:  #2C2C2E;
+    --bg-nav:       rgba(0,0,0,0.90);
+    --text-primary: #FFFFFF;
+    --text-2:       rgba(255,255,255,0.60);
+    --text-muted:   rgba(255,255,255,0.40);
+    --text-faint:   rgba(255,255,255,0.25);
+    --border:       rgba(255,255,255,0.10);
+    --border-faint: rgba(255,255,255,0.05);
+    --tap-active:   rgba(255,255,255,0.06);
+    --divider:      rgba(255,255,255,0.08);
+  }
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+html {
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+  color-scheme: light dark;
+}
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* ── Utilities ────────────────────────────────────────────────────────────── */
+.tabnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+* { -webkit-tap-highlight-color: transparent; }
+
+.tap-row:active { background: var(--tap-active); }

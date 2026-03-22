@@ -13,11 +13,11 @@ interface Article {
   isAnalystRec: boolean
 }
 
-const DIP_VERDICT_STYLE: Record<string, { label: string; classes: string }> = {
-  accumulate: { label: 'Accumulate on dip', classes: 'text-emerald-700' },
-  hold:       { label: 'Hold',              classes: 'text-blue-600' },
-  monitor:    { label: 'Monitor',           classes: 'text-yellow-700' },
-  avoid:      { label: 'Avoid adding',      classes: 'text-red-600' },
+const DIP_VERDICT_STYLE: Record<string, { label: string; color: string }> = {
+  accumulate: { label: 'Accumulate on dip', color: 'text-positive' },
+  hold:       { label: 'Hold',              color: 'text-warning'  },
+  monitor:    { label: 'Monitor',           color: 'text-warning'  },
+  avoid:      { label: 'Avoid adding',      color: 'text-negative' },
 }
 
 const VERDICT_PRIORITY = ['accumulate', 'avoid', 'monitor', 'hold']
@@ -70,10 +70,11 @@ function getTopSignal(articles: Article[]): Signal | null {
   return null
 }
 
+// Maps signal emoji to Haku token colour class
 const SIGNAL_COLOR: Record<string, string> = {
-  '❌': 'text-red-600',
-  '⚠️': 'text-yellow-600',
-  '✅': 'text-emerald-600',
+  '❌': 'text-negative',
+  '⚠️': 'text-warning',
+  '✅': 'text-positive',
 }
 
 export default function TickerCard({ ticker, name, tickerSummary, articles, onRefresh }: TickerCardProps) {
@@ -95,42 +96,38 @@ export default function TickerCard({ ticker, name, tickerSummary, articles, onRe
     }
   }
 
-  const handleSourcesToggle = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setSourcesExpanded((v) => !v)
-  }
-
   return (
-    // Entire card is tappable — tap anywhere to expand/collapse
-    <div
-      onClick={() => setExpanded((v) => !v)}
-      className="cursor-pointer select-none"
-    >
-      {/* Row — min 44pt height per HIG */}
-      <div className="flex items-center gap-3 min-h-[44px] py-2">
-        <span className="text-base font-semibold text-gray-900 flex-shrink-0 min-w-[5.5rem]">{ticker}</span>
+    <div onClick={() => setExpanded((v) => !v)} className="tap-row cursor-pointer select-none" style={{ borderBottom: '1px solid var(--divider)' }}>
+      {/* Row — min 48px per Haku ListRow contract */}
+      <div className="flex items-center gap-3 px-4 min-h-[48px] py-3">
+        {/* Primary: ticker symbol — headline (17px/600) */}
+        <span className="text-headline flex-shrink-0 min-w-[5.5rem]" style={{ color: 'var(--text-primary)' }}>
+          {ticker}
+        </span>
 
+        {/* Secondary: signal — subheadline (13px/400) */}
         <span className="flex-1 min-w-0">
           {hasNews && topSignal ? (
-            <span className={`text-base whitespace-nowrap ${SIGNAL_COLOR[topSignal]}`}>
+            <span className={`text-subheadline ${SIGNAL_COLOR[topSignal]}`}>
               {topSignal} {articles.length} signal{articles.length !== 1 ? 's' : ''}
             </span>
           ) : (
-            <span className="text-base text-gray-400">No updates</span>
+            <span className="text-subheadline" style={{ color: 'var(--text-faint)' }}>No updates</span>
           )}
         </span>
 
-        <div className="flex items-center gap-3 flex-shrink-0">
-          {/* Refresh — separate tap target, 44pt */}
+        {/* Trailing: refresh + chevron */}
+        <div className="flex items-center gap-1 flex-shrink-0">
           {onRefresh && (
             <div
               onClick={handleRefresh}
               role="button"
               aria-label={`Refresh ${ticker}`}
-              className="flex items-center justify-center w-11 h-11 -mr-2"
+              className="flex items-center justify-center min-h-tap min-w-tap"
             >
               <svg
-                className={`h-4 w-4 text-gray-400 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`}
+                className={`h-4 w-4 ${isRefreshing ? 'text-accent animate-spin' : ''}`}
+                style={!isRefreshing ? { color: 'var(--text-faint)' } : undefined}
                 fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -138,7 +135,8 @@ export default function TickerCard({ ticker, name, tickerSummary, articles, onRe
             </div>
           )}
           <svg
-            className={`h-3.5 w-3.5 text-gray-300 flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
+            className={`h-3 w-3 flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
+            style={{ color: 'var(--text-faint)' }}
             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -146,32 +144,39 @@ export default function TickerCard({ ticker, name, tickerSummary, articles, onRe
         </div>
       </div>
 
-      {/* Expanded body — also inside the tappable div, tap to collapse */}
+      {/* Expanded body — tapping here also collapses */}
       {expanded && (
-        <div className="pb-4 pr-2">
-          {name && <p className="text-sm text-gray-400 mb-2">{name}</p>}
+        <div className="px-4 pb-4">
+          {/* Company name — footnote */}
+          {name && (
+            <p className="text-footnote mb-2" style={{ color: 'var(--text-faint)' }}>{name}</p>
+          )}
+
           {hasNews ? (
             <div className="space-y-3">
+              {/* Bullets — body (15px) */}
               <ul className="space-y-1.5">
                 {parseBullets(tickerSummary).map((bullet, i) => (
-                  <li key={i} className="flex gap-2 text-[15px] text-gray-700 leading-snug">
-                    <span className="text-gray-300 flex-shrink-0 mt-0.5">•</span>
+                  <li key={i} className="flex gap-2 text-body" style={{ color: 'var(--text-primary)' }}>
+                    <span className="flex-shrink-0 mt-0.5" style={{ color: 'var(--text-faint)' }}>•</span>
                     <span>{bullet}</span>
                   </li>
                 ))}
               </ul>
 
+              {/* Dip verdict — subheadline */}
               {topDipVerdict && DIP_VERDICT_STYLE[topDipVerdict] && (
-                <p className={`text-sm font-medium ${DIP_VERDICT_STYLE[topDipVerdict].classes}`}>
+                <p className={`text-subheadline font-medium ${DIP_VERDICT_STYLE[topDipVerdict].color}`}>
                   {DIP_VERDICT_STYLE[topDipVerdict].label}
                 </p>
               )}
 
-              {/* Sources — stopPropagation so tapping here doesn't collapse the card */}
+              {/* Sources — stopPropagation so tapping doesn't collapse */}
               <div onClick={(e) => e.stopPropagation()}>
                 <button
-                  onClick={handleSourcesToggle}
-                  className="text-sm text-gray-400 min-h-[44px] flex items-center"
+                  onClick={() => setSourcesExpanded((v) => !v)}
+                  className="text-subheadline min-h-tap flex items-center"
+                  style={{ color: 'var(--text-muted)' }}
                 >
                   {sourcesExpanded ? 'Hide' : 'Show'} {Math.min(articles.length, 5)} source{Math.min(articles.length, 5) !== 1 ? 's' : ''}
                 </button>
@@ -184,14 +189,18 @@ export default function TickerCard({ ticker, name, tickerSummary, articles, onRe
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="text-[15px] text-blue-600 leading-snug block"
+                          className="text-body text-accent block leading-snug"
                         >
                           {article.title}
                         </a>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-sm text-gray-400">{formatIST(article.publishedAt)}</span>
+                          <span className="text-subheadline tabnum" style={{ color: 'var(--text-faint)' }}>
+                            {formatIST(article.publishedAt)}
+                          </span>
                           {article.isAnalystRec && (
-                            <span className="text-sm text-purple-600 font-medium">Analyst rec</span>
+                            <span className="text-subheadline font-medium" style={{ color: '#BF5AF2' }}>
+                              Analyst rec
+                            </span>
                           )}
                         </div>
                       </div>
@@ -201,7 +210,7 @@ export default function TickerCard({ ticker, name, tickerSummary, articles, onRe
               </div>
             </div>
           ) : (
-            <p className="text-[15px] text-gray-400">No material updates in this period.</p>
+            <p className="text-body" style={{ color: 'var(--text-faint)' }}>No material updates in this period.</p>
           )}
         </div>
       )}

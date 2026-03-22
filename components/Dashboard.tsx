@@ -165,14 +165,14 @@ export default function Dashboard() {
   const progressPct = refreshStatus ? Math.round((refreshStatus.done / refreshStatus.total) * 100) : 0
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Nav bar — 44pt height, HIG standard */}
-      <header className="border-b border-gray-200 sticky top-0 z-10 bg-white">
+    <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
+      {/* Nav bar */}
+      <header className="sticky top-0 z-10" style={{ background: 'var(--bg-nav)', borderBottom: '1px solid var(--border)' }}>
         <div className="max-w-2xl mx-auto px-4 flex items-center justify-between h-11">
-          <h1 className="text-[17px] font-semibold text-gray-900">Kelu</h1>
+          <h1 className="text-headline" style={{ color: 'var(--text-primary)' }}>Kelu</h1>
           <div className="flex items-center gap-4">
             {refreshStatus && (
-              <span className="text-[15px] text-gray-500">
+              <span className="text-subheadline" style={{ color: 'var(--text-muted)' }}>
                 {refreshStatus.total === 1
                   ? `Refreshing ${refreshStatus.ticker}…`
                   : `${refreshStatus.ticker} (${refreshStatus.done}/${refreshStatus.total})`}
@@ -181,13 +181,14 @@ export default function Dashboard() {
             <button
               onClick={refresh}
               disabled={refreshing || !!refreshStatus || loading}
-              className="text-[17px] text-blue-600 disabled:opacity-40 min-h-[44px] flex items-center"
+              className="text-headline text-accent disabled:opacity-40 min-h-tap flex items-center"
             >
               {refreshing || !!refreshStatus ? 'Refreshing…' : 'Refresh'}
             </button>
             <button
               onClick={handleSignOut}
-              className="text-[17px] text-gray-500 min-h-[44px] flex items-center"
+              className="text-headline min-h-tap flex items-center"
+              style={{ color: 'var(--text-2)' }}
             >
               Sign out
             </button>
@@ -195,26 +196,27 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4">
-        {/* Coverage dates — below nav bar, not inside it */}
+      <main className="max-w-2xl mx-auto">
+        {/* Coverage dates */}
         {!loading && data && !data.noData && (
-          <p className="text-sm text-gray-400 pt-3 pb-1 tabular-nums">
+          <p className="text-subheadline tabnum px-4 pt-3 pb-1" style={{ color: 'var(--text-faint)' }}>
             {formatIST(data.coverageStart)} — {formatIST(data.coverageEnd)}
           </p>
         )}
 
         {/* Error */}
         {error && (
-          <p className="py-3 text-xs text-red-600">{error}</p>
+          <p className="text-body px-4 py-3 text-negative">{error}</p>
         )}
 
         {/* Loading skeleton */}
         {loading && (
-          <div className="divide-y divide-gray-100">
+          <div style={{ borderTop: '1px solid var(--divider)' }}>
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="py-3 flex items-center gap-4 animate-pulse">
-                <div className="h-3 bg-gray-200 rounded w-12" />
-                <div className="h-3 bg-gray-100 rounded w-32" />
+              <div key={i} className="px-4 py-3 flex items-center gap-4 animate-pulse min-h-[48px]"
+                style={{ borderBottom: '1px solid var(--divider)' }}>
+                <div className="h-3 rounded w-16" style={{ background: 'var(--bg-tertiary)' }} />
+                <div className="h-3 rounded w-28" style={{ background: 'var(--bg-tertiary)' }} />
               </div>
             ))}
           </div>
@@ -222,12 +224,12 @@ export default function Dashboard() {
 
         {/* No data yet */}
         {!loading && data?.noData && (
-          <div className="py-16 text-center">
-            <p className="text-sm text-gray-500 mb-4">No data yet.</p>
+          <div className="py-16 text-center px-4">
+            <p className="text-body mb-4" style={{ color: 'var(--text-muted)' }}>No data yet.</p>
             <button
               onClick={refresh}
               disabled={refreshing}
-              className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-40 transition-colors"
+              className="text-body text-accent disabled:opacity-40"
             >
               {refreshing ? 'Refreshing…' : 'Fetch news now'}
             </button>
@@ -236,7 +238,7 @@ export default function Dashboard() {
 
         {/* Flat list */}
         {!loading && data && !data.noData && (
-          <div className="divide-y divide-gray-100">
+          <div style={{ borderTop: '1px solid var(--divider)' }}>
             {sortedTickers.map((t) => (
               <TickerCard
                 key={t.ticker}
