@@ -148,7 +148,7 @@ export default function TickerCard({ ticker, name, tickerSummary, articles, onRe
 
       {/* Expanded body — also inside the tappable div, tap to collapse */}
       {expanded && (
-        <div className="pb-4 pl-[5.5rem] pr-2">
+        <div className="pb-4 pr-2">
           {name && <p className="text-sm text-gray-400 mb-2">{name}</p>}
           {hasNews ? (
             <div className="space-y-3">
