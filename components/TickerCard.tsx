@@ -95,96 +95,103 @@ export default function TickerCard({ ticker, name, tickerSummary, articles, onRe
     }
   }
 
-  return (
-    <div>
-      {/* Row */}
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center gap-3 py-3.5 text-left min-w-0"
-      >
-        <span className="font-mono text-sm font-semibold text-gray-900 flex-shrink-0 min-w-[5rem]">{ticker}</span>
+  const handleSourcesToggle = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSourcesExpanded((v) => !v)
+  }
 
-        <span className="flex items-center gap-1.5 min-w-0">
+  return (
+    // Entire card is tappable — tap anywhere to expand/collapse
+    <div
+      onClick={() => setExpanded((v) => !v)}
+      className="cursor-pointer select-none"
+    >
+      {/* Row — min 44pt height per HIG */}
+      <div className="flex items-center gap-3 min-h-[44px] py-2">
+        <span className="text-base font-semibold text-gray-900 flex-shrink-0 min-w-[5.5rem]">{ticker}</span>
+
+        <span className="flex-1 min-w-0">
           {hasNews && topSignal ? (
-            <span className={`text-sm whitespace-nowrap ${SIGNAL_COLOR[topSignal]}`}>
+            <span className={`text-base whitespace-nowrap ${SIGNAL_COLOR[topSignal]}`}>
               {topSignal} {articles.length} signal{articles.length !== 1 ? 's' : ''}
             </span>
           ) : (
-            <span className="text-sm text-gray-400 italic">No updates</span>
+            <span className="text-base text-gray-400">No updates</span>
           )}
-          {name && <span className="text-xs text-gray-400 truncate hidden sm:block">{name}</span>}
         </span>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {/* Refresh — separate tap target, 44pt */}
           {onRefresh && (
-            <span
-              role="button"
+            <div
               onClick={handleRefresh}
-              title={`Refresh ${ticker}`}
-              className={`text-xs transition-colors ${
-                isRefreshing ? 'text-blue-400 cursor-not-allowed' : 'text-gray-300 hover:text-blue-500 cursor-pointer'
-              }`}
+              role="button"
+              aria-label={`Refresh ${ticker}`}
+              className="flex items-center justify-center w-11 h-11 -mr-2"
             >
               <svg
-                className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`}
+                className={`h-4 w-4 text-gray-400 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`}
                 fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-            </span>
+            </div>
           )}
           <svg
-            className={`h-3 w-3 text-gray-300 flex-shrink-0 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+            className={`h-3.5 w-3.5 text-gray-300 flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
         </div>
-      </button>
+      </div>
 
-      {/* Expanded body */}
+      {/* Expanded body — also inside the tappable div, tap to collapse */}
       {expanded && (
-        <div className="pb-4 pl-[5rem]">
+        <div className="pb-4 pl-[5.5rem] pr-2">
+          {name && <p className="text-sm text-gray-400 mb-2">{name}</p>}
           {hasNews ? (
-            <div className="space-y-2">
-              <ul className="space-y-1 text-sm text-gray-700 leading-relaxed">
+            <div className="space-y-3">
+              <ul className="space-y-1.5">
                 {parseBullets(tickerSummary).map((bullet, i) => (
-                  <li key={i} className="flex gap-2">
-                    <span className="text-gray-300 flex-shrink-0">•</span>
+                  <li key={i} className="flex gap-2 text-[15px] text-gray-700 leading-snug">
+                    <span className="text-gray-300 flex-shrink-0 mt-0.5">•</span>
                     <span>{bullet}</span>
                   </li>
                 ))}
               </ul>
 
               {topDipVerdict && DIP_VERDICT_STYLE[topDipVerdict] && (
-                <p className={`text-xs font-medium ${DIP_VERDICT_STYLE[topDipVerdict].classes}`}>
+                <p className={`text-sm font-medium ${DIP_VERDICT_STYLE[topDipVerdict].classes}`}>
                   {DIP_VERDICT_STYLE[topDipVerdict].label}
                 </p>
               )}
 
-              <div className="pt-1">
+              {/* Sources — stopPropagation so tapping here doesn't collapse the card */}
+              <div onClick={(e) => e.stopPropagation()}>
                 <button
-                  onClick={() => setSourcesExpanded((v) => !v)}
-                  className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                  onClick={handleSourcesToggle}
+                  className="text-sm text-gray-400 min-h-[44px] flex items-center"
                 >
                   {sourcesExpanded ? 'Hide' : 'Show'} {Math.min(articles.length, 5)} source{Math.min(articles.length, 5) !== 1 ? 's' : ''}
                 </button>
                 {sourcesExpanded && (
-                  <div className="mt-2 space-y-2">
+                  <div className="space-y-3 pb-1">
                     {getTopSources(articles).map((article, i) => (
                       <div key={i}>
                         <a
                           href={article.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:underline leading-snug block"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[15px] text-blue-600 leading-snug block"
                         >
                           {article.title}
                         </a>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-gray-400">{formatIST(article.publishedAt)}</span>
+                          <span className="text-sm text-gray-400">{formatIST(article.publishedAt)}</span>
                           {article.isAnalystRec && (
-                            <span className="text-xs text-purple-600 font-medium">Analyst rec</span>
+                            <span className="text-sm text-purple-600 font-medium">Analyst rec</span>
                           )}
                         </div>
                       </div>
@@ -194,7 +201,7 @@ export default function TickerCard({ ticker, name, tickerSummary, articles, onRe
               </div>
             </div>
           ) : (
-            <p className="text-xs text-gray-400 italic">No material updates in this period.</p>
+            <p className="text-[15px] text-gray-400">No material updates in this period.</p>
           )}
         </div>
       )}

@@ -166,20 +166,13 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Top bar */}
+      {/* Nav bar — 44pt height, HIG standard */}
       <header className="border-b border-gray-200 sticky top-0 z-10 bg-white">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex flex-col gap-0.5">
-            <h1 className="text-sm font-semibold text-gray-900 tracking-tight">Kelu</h1>
-            {!loading && data && !data.noData && (
-              <span className="text-[11px] text-gray-400 tabular-nums">
-                {formatIST(data.coverageStart)} — {formatIST(data.coverageEnd)}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
+        <div className="max-w-2xl mx-auto px-4 flex items-center justify-between h-11">
+          <h1 className="text-[17px] font-semibold text-gray-900">Kelu</h1>
+          <div className="flex items-center gap-4">
             {refreshStatus && (
-              <span className="text-xs text-gray-500">
+              <span className="text-[15px] text-gray-500">
                 {refreshStatus.total === 1
                   ? `Refreshing ${refreshStatus.ticker}…`
                   : `${refreshStatus.ticker} (${refreshStatus.done}/${refreshStatus.total})`}
@@ -188,13 +181,13 @@ export default function Dashboard() {
             <button
               onClick={refresh}
               disabled={refreshing || !!refreshStatus || loading}
-              className="text-xs text-blue-600 hover:text-blue-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="text-[17px] text-blue-600 disabled:opacity-40 min-h-[44px] flex items-center"
             >
               {refreshing || !!refreshStatus ? 'Refreshing…' : 'Refresh'}
             </button>
             <button
               onClick={handleSignOut}
-              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-[17px] text-gray-500 min-h-[44px] flex items-center"
             >
               Sign out
             </button>
@@ -203,6 +196,13 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4">
+        {/* Coverage dates — below nav bar, not inside it */}
+        {!loading && data && !data.noData && (
+          <p className="text-sm text-gray-400 pt-3 pb-1 tabular-nums">
+            {formatIST(data.coverageStart)} — {formatIST(data.coverageEnd)}
+          </p>
+        )}
+
         {/* Error */}
         {error && (
           <p className="py-3 text-xs text-red-600">{error}</p>
