@@ -69,15 +69,17 @@ export async function POST(req: NextRequest) {
 
   console.log(`[${ticker}] POST started`)
 
-  // Fetch RSS + DB dedup in parallel
-  const [{ data: existing, error: dedupErr }, articles] = await Promise.all([
+  // Fetch RSS + DB dedup in parallel (rss_url may be comma-separated for multiple feeds)
+  const rssUrls = stock.rss_url.split(',').map((u: string) => u.trim()).filter(Boolean)
+  const [{ data: existing, error: dedupErr }, ...feedResults] = await Promise.all([
     serviceClient
       .from('analyzed_articles')
       .select('article_url, signal')
       .eq('ticker', ticker)
       .gte('published_at', coverageStart.toISOString()),
-    fetchRssFeed(stock.rss_url, coverageStart, coverageEnd),
+    ...rssUrls.map((url: string) => fetchRssFeed(url, coverageStart, coverageEnd)),
   ])
+  const articles = feedResults.flat()
 
   if (dedupErr) console.error(`[${ticker}] Dedup error:`, dedupErr.message)
 
