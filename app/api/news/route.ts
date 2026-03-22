@@ -82,9 +82,7 @@ export async function POST(req: NextRequest) {
   if (dedupErr) console.error(`[${ticker}] Dedup error:`, dedupErr.message)
 
   const seenUrls = new Set(
-    (existing || [])
-      .filter((r: { signal: string | null }) => r.signal !== null)
-      .map((r: { article_url: string }) => r.article_url)
+    (existing || []).map((r: { article_url: string }) => r.article_url)
   )
 
   console.log(`[${ticker}] RSS: ${articles.length} articles in window`)

@@ -38,7 +38,6 @@ function formatIST(iso: string): string {
     timeZone: 'Asia/Kolkata',
     day: '2-digit',
     month: 'short',
-    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
@@ -166,112 +165,56 @@ export default function Dashboard() {
   const progressPct = refreshStatus ? Math.round((refreshStatus.done / refreshStatus.total) * 100) : 0
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       {/* Top bar */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-bold text-gray-900 tracking-tight">Kelu</h1>
-            <span className="text-xs text-gray-400 hidden sm:block">Financial News Dashboard</span>
+      <header className="border-b border-gray-200 sticky top-0 z-10 bg-white">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h1 className="text-sm font-semibold text-gray-900 tracking-tight">Kelu</h1>
+            {!loading && data && !data.noData && (
+              <span className="text-xs text-gray-400">
+                {formatIST(data.coverageStart)} — {formatIST(data.coverageEnd)}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3">
+            {refreshStatus && (
+              <span className="text-xs text-gray-500">
+                {refreshStatus.total === 1
+                  ? `Refreshing ${refreshStatus.ticker}…`
+                  : `${refreshStatus.ticker} (${refreshStatus.done}/${refreshStatus.total})`}
+              </span>
+            )}
             <button
               onClick={refresh}
               disabled={refreshing || !!refreshStatus || loading}
-              className="px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+              className="text-xs text-blue-600 hover:text-blue-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Refresh All
+              {refreshing || !!refreshStatus ? 'Refreshing…' : 'Refresh'}
             </button>
             <button
               onClick={handleSignOut}
-              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
             >
               Sign out
             </button>
           </div>
         </div>
-
-        {/* Fetch status bar — visible during any refresh */}
-        {refreshStatus && (
-          <div className="bg-blue-600 text-white">
-            <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center gap-3">
-              <svg className="animate-spin h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              <span className="text-sm font-semibold flex-shrink-0">
-                {refreshStatus.total === 1
-                  ? `Refreshing ${refreshStatus.ticker}…`
-                  : `Analyzing ${refreshStatus.ticker}`}
-              </span>
-              {refreshStatus.total > 1 && (
-                <>
-                  <div className="flex-1 bg-blue-500 rounded-full h-2 overflow-hidden">
-                    <div
-                      className="bg-white rounded-full h-2 transition-all duration-500"
-                      style={{ width: `${progressPct}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-blue-200 font-mono flex-shrink-0 tabular-nums">
-                    {refreshStatus.done}/{refreshStatus.total}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-        )}
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6">
-        {/* Coverage info */}
-        {!loading && data && !data.noData && (
-          <div className="mb-6 bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap gap-4 items-center justify-between">
-            <div className="space-y-0.5">
-              <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Coverage Window</p>
-              <p className="text-sm text-gray-800 font-medium">
-                {formatIST(data.coverageStart)} → {formatIST(data.coverageEnd)}
-              </p>
-            </div>
-            <div className="space-y-0.5 text-right">
-              <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Last Run</p>
-              <p className="text-sm text-gray-800">{formatIST(data.runAt)}</p>
-            </div>
-            <div className="flex gap-4 text-sm">
-              <div className="text-center">
-                <p className="font-bold text-2xl text-blue-600">{withNewsCount}</p>
-                <p className="text-xs text-gray-500">tickers with news</p>
-              </div>
-              <div className="text-center">
-                <p className="font-bold text-2xl text-gray-700">
-                  {data.tickers?.reduce((sum, t) => sum + t.articles.length, 0) ?? 0}
-                </p>
-                <p className="text-xs text-gray-500">total articles</p>
-              </div>
-            </div>
-          </div>
-        )}
-
+      <main className="max-w-2xl mx-auto px-4">
         {/* Error */}
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-            {error}
-          </div>
+          <p className="py-3 text-xs text-red-600">{error}</p>
         )}
 
         {/* Loading skeleton */}
         {loading && (
-          <div className="flex flex-col gap-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="rounded-xl border border-gray-200 bg-white px-5 py-4 animate-pulse flex items-center gap-3"
-              >
-                <div className="h-4 w-4 bg-gray-200 rounded" />
-                <div className="h-4 bg-gray-200 rounded w-16" />
-                <div className="h-3 bg-gray-100 rounded w-48" />
+          <div className="divide-y divide-gray-100">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="py-3 flex items-center gap-4 animate-pulse">
+                <div className="h-3 bg-gray-200 rounded w-12" />
+                <div className="h-3 bg-gray-100 rounded w-32" />
               </div>
             ))}
           </div>
@@ -279,22 +222,21 @@ export default function Dashboard() {
 
         {/* No data yet */}
         {!loading && data?.noData && (
-          <div className="text-center py-16">
-            <p className="text-gray-500 text-lg mb-4">No data yet.</p>
-            <p className="text-gray-400 text-sm mb-6">Click Refresh All to fetch and analyze the latest news.</p>
+          <div className="py-16 text-center">
+            <p className="text-sm text-gray-500 mb-4">No data yet.</p>
             <button
               onClick={refresh}
               disabled={refreshing}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-40 transition-colors"
             >
-              {refreshing ? 'Refreshing…' : 'Fetch News Now'}
+              {refreshing ? 'Refreshing…' : 'Fetch news now'}
             </button>
           </div>
         )}
 
-        {/* Cards */}
+        {/* Flat list */}
         {!loading && data && !data.noData && (
-          <div className="flex flex-col gap-3">
+          <div className="divide-y divide-gray-100">
             {sortedTickers.map((t) => (
               <TickerCard
                 key={t.ticker}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { getSignalBg, getSignalBadge, type Signal } from '@/lib/stocks'
+import { type Signal } from '@/lib/stocks'
 
 interface Article {
   title: string
@@ -14,13 +14,12 @@ interface Article {
 }
 
 const DIP_VERDICT_STYLE: Record<string, { label: string; classes: string }> = {
-  accumulate: { label: 'Accumulate on dip', classes: 'bg-emerald-100 text-emerald-800' },
-  hold:       { label: 'Hold',              classes: 'bg-blue-100 text-blue-700' },
-  monitor:    { label: 'Monitor',           classes: 'bg-yellow-100 text-yellow-800' },
-  avoid:      { label: 'Avoid adding',      classes: 'bg-red-100 text-red-700' },
+  accumulate: { label: 'Accumulate on dip', classes: 'text-emerald-700' },
+  hold:       { label: 'Hold',              classes: 'text-blue-600' },
+  monitor:    { label: 'Monitor',           classes: 'text-yellow-700' },
+  avoid:      { label: 'Avoid adding',      classes: 'text-red-600' },
 }
 
-// Pick the most actionable dip verdict across all articles
 const VERDICT_PRIORITY = ['accumulate', 'avoid', 'monitor', 'hold']
 function getTopDipVerdict(articles: Article[]): string | null {
   for (const v of VERDICT_PRIORITY) {
@@ -37,10 +36,8 @@ function getTopSources(articles: Article[], limit = 5): Article[] {
 }
 
 function parseBullets(text: string): string[] {
-  // Try newline-separated first
   const lines = text.split('\n').map((l) => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean)
   if (lines.length > 1) return lines
-  // Fallback: inline bullets separated by " - "
   const inline = text.split(/\s+-\s+/).map((l) => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean)
   if (inline.length > 1) return inline
   return lines
@@ -73,13 +70,18 @@ function getTopSignal(articles: Article[]): Signal | null {
   return null
 }
 
+const SIGNAL_COLOR: Record<string, string> = {
+  '❌': 'text-red-600',
+  '⚠️': 'text-yellow-600',
+  '✅': 'text-emerald-600',
+}
+
 export default function TickerCard({ ticker, name, tickerSummary, articles, onRefresh }: TickerCardProps) {
   const [expanded, setExpanded] = useState(true)
   const [sourcesExpanded, setSourcesExpanded] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const topSignal = getTopSignal(articles)
   const hasNews = articles.length > 0
-  const cardBg = hasNews ? getSignalBg(topSignal) : 'bg-white border-gray-200'
   const topDipVerdict = getTopDipVerdict(articles)
 
   const handleRefresh = async (e: React.MouseEvent) => {
@@ -94,46 +96,32 @@ export default function TickerCard({ ticker, name, tickerSummary, articles, onRe
   }
 
   return (
-    <div className={`rounded-xl border ${cardBg} transition-all`}>
-      {/* Header row */}
+    <div>
+      {/* Row */}
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center justify-between px-5 py-4 text-left"
+        className="w-full flex items-center gap-3 py-3 text-left"
       >
-        <div className="flex items-center gap-3 min-w-0">
-          <svg
-            className={`h-4 w-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
-            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-          <div className="min-w-0">
-            <span className="font-bold text-gray-900 text-sm">{ticker}</span>
-            {name && <span className="ml-2 text-xs text-gray-500">{name}</span>}
-            {!expanded && tickerSummary && hasNews && (
-              <p className="text-xs text-gray-500 mt-0.5 truncate max-w-md">{tickerSummary}</p>
-            )}
-          </div>
-        </div>
+        <span className="font-mono text-sm font-semibold text-gray-900 w-14 flex-shrink-0">{ticker}</span>
 
-        <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-          {hasNews && topSignal ? (
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getSignalBadge(topSignal)}`}>
-              {topSignal} {articles.length} signal{articles.length !== 1 ? 's' : ''}
-            </span>
-          ) : (
-            <span className="text-xs text-gray-400 italic">No material updates</span>
-          )}
+        {hasNews && topSignal ? (
+          <span className={`text-sm ${SIGNAL_COLOR[topSignal]}`}>
+            {topSignal} {articles.length} signal{articles.length !== 1 ? 's' : ''}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400 italic">No updates</span>
+        )}
 
+        {name && <span className="text-xs text-gray-400 hidden sm:block">{name}</span>}
+
+        <div className="ml-auto flex items-center gap-2">
           {onRefresh && (
             <span
               role="button"
               onClick={handleRefresh}
               title={`Refresh ${ticker}`}
-              className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
-                isRefreshing
-                  ? 'text-blue-500 bg-blue-50 cursor-not-allowed'
-                  : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50 cursor-pointer'
+              className={`text-xs transition-colors ${
+                isRefreshing ? 'text-blue-400 cursor-not-allowed' : 'text-gray-300 hover:text-blue-500 cursor-pointer'
               }`}
             >
               <svg
@@ -144,65 +132,58 @@ export default function TickerCard({ ticker, name, tickerSummary, articles, onRe
               </svg>
             </span>
           )}
+          <svg
+            className={`h-3 w-3 text-gray-300 flex-shrink-0 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
         </div>
       </button>
 
-      {/* Collapsible body */}
+      {/* Expanded body */}
       {expanded && (
-        <div className="px-5 pb-5 border-t border-gray-200">
+        <div className="pb-3 pl-14">
           {hasNews ? (
-            <div className="pt-3 space-y-3">
-              {/* Bullet summary */}
-              <ul className="space-y-1.5 text-sm text-gray-800 leading-relaxed">
+            <div className="space-y-2">
+              <ul className="space-y-1 text-sm text-gray-700 leading-relaxed">
                 {parseBullets(tickerSummary).map((bullet, i) => (
                   <li key={i} className="flex gap-2">
-                    <span className="text-gray-400 flex-shrink-0 mt-0.5">•</span>
+                    <span className="text-gray-300 flex-shrink-0">•</span>
                     <span>{bullet}</span>
                   </li>
                 ))}
               </ul>
 
-              {/* Dip verdict */}
               {topDipVerdict && DIP_VERDICT_STYLE[topDipVerdict] && (
-                <div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${DIP_VERDICT_STYLE[topDipVerdict].classes}`}>
-                    {DIP_VERDICT_STYLE[topDipVerdict].label}
-                  </span>
-                </div>
+                <p className={`text-xs font-medium ${DIP_VERDICT_STYLE[topDipVerdict].classes}`}>
+                  {DIP_VERDICT_STYLE[topDipVerdict].label}
+                </p>
               )}
 
-              {/* Sources toggle */}
-              <div className="border-t border-gray-100 pt-3">
+              <div className="pt-1">
                 <button
                   onClick={() => setSourcesExpanded((v) => !v)}
-                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                  className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  <svg
-                    className={`h-3 w-3 transition-transform duration-150 ${sourcesExpanded ? 'rotate-90' : ''}`}
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                  {Math.min(articles.length, 5)} source{Math.min(articles.length, 5) !== 1 ? 's' : ''}
+                  {sourcesExpanded ? 'Hide' : 'Show'} {Math.min(articles.length, 5)} source{Math.min(articles.length, 5) !== 1 ? 's' : ''}
                 </button>
                 {sourcesExpanded && (
-                  <div className="mt-2 space-y-1.5">
+                  <div className="mt-2 space-y-2">
                     {getTopSources(articles).map((article, i) => (
-                      <div key={i} className="min-w-0">
+                      <div key={i}>
                         <a
                           href={article.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:underline leading-snug block truncate"
+                          className="text-xs text-blue-600 hover:underline leading-snug block"
                         >
                           {article.title}
                         </a>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-xs text-gray-400">{formatIST(article.publishedAt)}</span>
                           {article.isAnalystRec && (
-                            <span className="text-xs px-1 py-0 rounded bg-purple-100 text-purple-700 font-medium">
-                              Analyst rec
-                            </span>
+                            <span className="text-xs text-purple-600 font-medium">Analyst rec</span>
                           )}
                         </div>
                       </div>
@@ -212,7 +193,7 @@ export default function TickerCard({ ticker, name, tickerSummary, articles, onRe
               </div>
             </div>
           ) : (
-            <p className="text-sm text-gray-400 italic pt-3">No material updates in this period.</p>
+            <p className="text-xs text-gray-400 italic">No material updates in this period.</p>
           )}
         </div>
       )}
