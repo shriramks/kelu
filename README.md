@@ -33,6 +33,7 @@ Kelu connects a Google Alerts RSS feed to each stock in your watchlist. Every re
 2. Fetches the full meta description from each article URL for richer context
 3. Runs each article through Gemini AI — is this actually material for a long-term investor?
 4. Stores results and surfaces only what passes the filter, with a signal flag and a plain-English summary
+5. After all articles are analysed, synthesises everything into a short bullet-point briefing per ticker — so you read a three-line AI summary, not ten headlines
 
 No brokerage integration. No auto-sync. Intentionally manual.
 
@@ -44,7 +45,9 @@ Analysis uses **Gemini 2.5 Flash** (Groq llama-3.1-8b as fallback):
 
 - **Per-article signal**: ✅ positive catalyst, ⚠️ watch, ❌ thesis-breaking event
 - **Dip verdict**: `accumulate / hold / monitor / avoid` — should you add if the stock pulls back?
-- **Synthesis**: after each refresh, a bullet-point briefing per ticker summarising all signals found
+- **AI summary**: after each refresh, Gemini reads all signals found in the window and writes a short bullet-point briefing per ticker — what happened, why it matters, and whether the thesis holds
+
+Tap any ticker to expand its AI-written summary. Sources are listed below it if you want to verify.
 
 Stocks and their investment context (what to include, what to ignore) are configured in Supabase — no hardcoded watchlist in the code.
 
