@@ -33,7 +33,7 @@ type TickerResult = {
 // POST { ticker } — analyze one ticker (called once per ticker from the client)
 // POST {}        — record the news_run timestamp after all tickers are done
 export async function POST(req: NextRequest) {
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const {
     data: { user },
     error: authError,
@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
 
 // GET — pure DB read: rolling 24h window, no AI calls
 export async function GET(req: NextRequest) {
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
   const {
     data: { user },
     error: authError,
