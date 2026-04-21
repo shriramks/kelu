@@ -1,6 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import Groq from 'groq-sdk'
 import type { Signal } from './stocks'
 
 export type DipVerdict = 'accumulate' | 'hold' | 'avoid' | 'monitor'
@@ -101,22 +99,6 @@ function parseAnalysis(text: string): AnalysisResult {
 
 // ─── Provider implementations ─────────────────────────────────────────────────
 
-async function analyzeWithGroq(ticker: string, tickerName: string, context: string, title: string, snippet: string, seenEvents: string[]): Promise<AnalysisResult> {
-  const client = new Groq({ apiKey: process.env.GROQ_API_KEY })
-  const response = await client.chat.completions.create({
-    model: 'llama-3.1-8b-instant',
-    max_tokens: 400,
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: analysisPrompt(ticker, tickerName, context, title, snippet, seenEvents) },
-    ],
-  })
-  const text = response.choices[0]?.message?.content ?? ''
-  const inputTokens = response.usage?.prompt_tokens
-  const outputTokens = response.usage?.completion_tokens
-  return { ...parseAnalysis(text), inputTokens, outputTokens, provider: 'groq' }
-}
-
 async function analyzeWithGemini(ticker: string, tickerName: string, context: string, title: string, snippet: string, seenEvents: string[]): Promise<AnalysisResult> {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
   const model = genAI.getGenerativeModel({
@@ -130,31 +112,6 @@ async function analyzeWithGemini(ticker: string, tickerName: string, context: st
   return { ...parseAnalysis(text), inputTokens, outputTokens, provider: 'gemini' }
 }
 
-async function analyzeWithClaude(ticker: string, tickerName: string, context: string, title: string, snippet: string, seenEvents: string[]): Promise<AnalysisResult> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 256,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: analysisPrompt(ticker, tickerName, context, title, snippet, seenEvents) }],
-  })
-  const content = response.content[0]
-  const text = content.type === 'text' ? content.text : ''
-  const inputTokens = response.usage.input_tokens
-  const outputTokens = response.usage.output_tokens
-  return { ...parseAnalysis(text), inputTokens, outputTokens, provider: 'claude' }
-}
-
-async function synthesizeWithGroq(prompt: string): Promise<string> {
-  const client = new Groq({ apiKey: process.env.GROQ_API_KEY })
-  const response = await client.chat.completions.create({
-    model: 'llama-3.1-8b-instant',
-    max_tokens: 400,
-    messages: [{ role: 'user', content: prompt }],
-  })
-  return response.choices[0]?.message?.content?.trim() ?? ''
-}
-
 async function synthesizeWithGemini(prompt: string): Promise<string> {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
@@ -162,28 +119,7 @@ async function synthesizeWithGemini(prompt: string): Promise<string> {
   return result.response.text().trim()
 }
 
-async function synthesizeWithClaude(prompt: string): Promise<string> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 400,
-    messages: [{ role: 'user', content: prompt }],
-  })
-  const content = response.content[0]
-  return content.type === 'text' ? content.text.trim() : ''
-}
-
-// ─── Public API with fallback chain ──────────────────────────────────────────
-
-const PROVIDERS = ['gemini', 'groq'] as const // gemini primary, groq fallback; claude disabled (no credits)
-type Provider = typeof PROVIDERS[number]
-
-function isAvailable(provider: Provider): boolean {
-  if (provider === 'groq') return !!process.env.GROQ_API_KEY
-  if (provider === 'gemini') return !!process.env.GEMINI_API_KEY
-  if (provider === 'claude') return !!process.env.ANTHROPIC_API_KEY
-  return false
-}
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function analyzeArticle(
   ticker: string,
@@ -192,23 +128,14 @@ export async function analyzeArticle(
   title: string,
   snippet: string,
 ): Promise<AnalysisResult> {
-  for (const provider of PROVIDERS) {
-    if (!isAvailable(provider)) continue
-    try {
-      let result: AnalysisResult
-      if (provider === 'groq') result = await analyzeWithGroq(ticker, tickerName, context, title, snippet, [])
-      else if (provider === 'gemini') result = await analyzeWithGemini(ticker, tickerName, context, title, snippet, [])
-      else result = await analyzeWithClaude(ticker, tickerName, context, title, snippet, [])
-
-      console.log(`  [${provider}] tokens in=${result.inputTokens} out=${result.outputTokens} relevant=${result.relevant} signal=${result.signal}`)
-      return result
-    } catch (err) {
-      console.warn(`  [${provider}] failed, trying next:`, (err as Error).message.slice(0, 120))
-    }
+  try {
+    const result = await analyzeWithGemini(ticker, tickerName, context, title, snippet, [])
+    console.log(`  [gemini] tokens in=${result.inputTokens} out=${result.outputTokens} relevant=${result.relevant} signal=${result.signal}`)
+    return result
+  } catch (err) {
+    console.error(`  [analyzer] gemini failed for ${ticker}:`, (err as Error).message.slice(0, 120))
+    return { relevant: false, signal: null, summary: null, dipVerdict: null, isAnalystRec: false }
   }
-
-  console.error(`  [analyzer] all providers failed for ${ticker}`)
-  return { relevant: false, signal: null, summary: null, dipVerdict: null, isAnalystRec: false }
 }
 
 export async function synthesizeTicker(
@@ -223,20 +150,12 @@ export async function synthesizeTicker(
   ).join('\n')
   const prompt = synthesisPrompt(ticker, tickerName, findings)
 
-  for (const provider of PROVIDERS) {
-    if (!isAvailable(provider)) continue
-    try {
-      let text: string
-      if (provider === 'groq') text = await synthesizeWithGroq(prompt)
-      else if (provider === 'gemini') text = await synthesizeWithGemini(prompt)
-      else text = await synthesizeWithClaude(prompt)
-
-      console.log(`  [synthesize:${provider}] ${ticker}: "${text.slice(0, 80)}"`)
-      return text
-    } catch (err) {
-      console.warn(`  [synthesize:${provider}] failed:`, (err as Error).message.slice(0, 80))
-    }
+  try {
+    const text = await synthesizeWithGemini(prompt)
+    console.log(`  [synthesize:gemini] ${ticker}: "${text.slice(0, 80)}"`)
+    return text
+  } catch (err) {
+    console.warn(`  [synthesize:gemini] failed:`, (err as Error).message.slice(0, 80))
+    return 'Could not generate summary.'
   }
-
-  return 'Could not generate summary.'
 }
